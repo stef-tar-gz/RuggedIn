@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  ActivityIndicator, TouchableOpacity
+  ActivityIndicator, TouchableOpacity, Animated
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
@@ -17,6 +17,7 @@ type Exercise = {
   rest_seconds: number;
   notes: string | null;
   order_index: number;
+  day_index: number;
   has_dropset: boolean;
   dropset_percentage: number | null;
   has_backoff: boolean;
@@ -42,9 +43,23 @@ export default function AthletePlanScreen() {
   const [infoExercise, setInfoExercise] = useState<ExerciseInfo | null>(null);
   const s = makeStyles(colors);
 
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  const statsAnim = useRef(new Animated.Value(0)).current;
+  const exercisesAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     fetchPlan();
   }, [id]);
+
+  useEffect(() => {
+    if (!loading) {
+      Animated.stagger(120, [
+        Animated.timing(headerAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(statsAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(exercisesAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [loading]);
 
   const fetchPlan = async () => {
     const { data: planData } = await supabase
@@ -55,7 +70,7 @@ export default function AthletePlanScreen() {
 
     const { data: exData } = await supabase
       .from('exercises')
-      .select('id, name, muscle_group, sets, reps, rest_seconds, notes, order_index, has_dropset, dropset_percentage, has_backoff, backoff_percentage, catalog_exercise_id, exercise_catalog(name, muscle_group, equipment, difficulty, description, video_url)')
+      .select('id, name, muscle_group, sets, reps, rest_seconds, notes, order_index, day_index, has_dropset, dropset_percentage, has_backoff, backoff_percentage, catalog_exercise_id, exercise_catalog(name, muscle_group, equipment, difficulty, description, video_url)')
       .eq('workout_plan_id', id)
       .eq('is_deleted', false)
       .order('order_index');
@@ -76,89 +91,107 @@ export default function AthletePlanScreen() {
     <>
     <ScrollView style={s.container} contentContainerStyle={s.content}>
 
-      <TouchableOpacity style={s.backButton} onPress={() => router.back()}>
-        <Text style={s.backText}>‹ Le mie schede</Text>
-      </TouchableOpacity>
+      <Animated.View style={{ opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
+        <TouchableOpacity style={s.backButton} onPress={() => router.back()}>
+          <Text style={s.backText}>‹ Le mie schede</Text>
+        </TouchableOpacity>
 
-      <View style={s.planHeader}>
-        <View style={s.planTitleRow}>
-          <Text style={s.planName}>{plan?.name}</Text>
-          <View style={[s.statusBadge, { backgroundColor: plan?.is_active ? colors.successBg : colors.surface }]}>
-            <View style={[s.statusDot, { backgroundColor: plan?.is_active ? '#4CAF50' : colors.textMuted }]} />
-            <Text style={[s.statusText, { color: plan?.is_active ? '#4CAF50' : colors.textMuted }]}>
-              {plan?.is_active ? 'Attiva' : 'Inattiva'}
-            </Text>
-          </View>
-        </View>
-        {plan?.description && <Text style={s.planDesc}>{plan.description}</Text>}
-        <Text style={s.planDate}>📅 Creata il {new Date(plan?.created_at ?? '').toLocaleDateString('it-IT')}</Text>
-      </View>
-
-      <View style={s.statsRow}>
-        <View style={s.statBox}>
-          <Text style={s.statValue}>{plan?.exercises.length}</Text>
-          <Text style={s.statLabel}>Esercizi</Text>
-        </View>
-        <View style={s.statBox}>
-          <Text style={s.statValue}>{plan?.exercises.reduce((sum, e) => sum + e.sets, 0)}</Text>
-          <Text style={s.statLabel}>Serie totali</Text>
-        </View>
-        <View style={s.statBox}>
-          <Text style={s.statValue}>{Math.round((plan?.exercises.reduce((sum, e) => sum + e.rest_seconds * e.sets, 0) ?? 0) / 60)}m</Text>
-          <Text style={s.statLabel}>Riposo est.</Text>
-        </View>
-      </View>
-
-      <Text style={s.sectionTitle}>Esercizi</Text>
-      {plan?.exercises.map((exercise, index) => (
-        <View key={exercise.id} style={s.exerciseCard}>
-          <View style={s.exerciseLeft}>
-            <Text style={s.exerciseIndex}>{index + 1}</Text>
-          </View>
-          <View style={s.exerciseBody}>
-            <View style={s.exerciseNameRow}>
-              <Text style={s.exerciseName}>{exercise.name}</Text>
-              {exercise.catalog_exercise_id && (
-                <TouchableOpacity
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  onPress={() => {
-                    const cat = (exercise as any).exercise_catalog;
-                    if (cat) setInfoExercise({ name: exercise.name, muscle_group: cat.muscle_group, equipment: cat.equipment, difficulty: cat.difficulty, description: cat.description, video_url: cat.video_url });
-                  }}
-                >
-                  <Text style={s.infoBtn}>ℹ️</Text>
-                </TouchableOpacity>
-              )}
+        <View style={s.planHeader}>
+          <View style={s.planTitleRow}>
+            <Text style={s.planName}>{plan?.name}</Text>
+            <View style={[s.statusBadge, { backgroundColor: plan?.is_active ? colors.successBg : colors.surface }]}>
+              <View style={[s.statusDot, { backgroundColor: plan?.is_active ? '#4CAF50' : colors.textMuted }]} />
+              <Text style={[s.statusText, { color: plan?.is_active ? '#4CAF50' : colors.textMuted }]}>
+                {plan?.is_active ? 'Attiva' : 'Inattiva'}
+              </Text>
             </View>
-            {exercise.muscle_group && <Text style={s.muscleGroup}>{exercise.muscle_group}</Text>}
-            <View style={s.pillRow}>
-              <StatPill label="Serie" value={`${exercise.sets}`} colors={colors} />
-              <StatPill label="Reps" value={`${exercise.reps}`} colors={colors} />
-              <StatPill label="Riposo" value={`${exercise.rest_seconds}s`} colors={colors} />
-            </View>
-            {exercise.has_dropset && (
-              <View style={s.techniqueBadge}>
-                <View style={[s.techniqueIndicator, { backgroundColor: colors.accent }]} />
-                <Text style={s.techniqueText}>Dropset -{exercise.dropset_percentage}%</Text>
-              </View>
-            )}
-            {exercise.has_backoff && (
-              <View style={s.techniqueBadge}>
-                <View style={[s.techniqueIndicator, { backgroundColor: '#2196F3' }]} />
-                <Text style={s.techniqueText}>Backoff -{exercise.backoff_percentage}%</Text>
-              </View>
-            )}
-            {exercise.notes && <Text style={s.exerciseNotes}>📝 {exercise.notes}</Text>}
+          </View>
+          {plan?.description && <Text style={s.planDesc}>{plan.description}</Text>}
+          <Text style={s.planDate}>📅 Creata il {new Date(plan?.created_at ?? '').toLocaleDateString('it-IT')}</Text>
+        </View>
+      </Animated.View>
+
+      <Animated.View style={{ opacity: statsAnim, transform: [{ translateY: statsAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
+        <View style={s.statsRow}>
+          <View style={s.statBox}>
+            <Text style={s.statValue}>{plan?.exercises.length}</Text>
+            <Text style={s.statLabel}>Esercizi</Text>
+          </View>
+          <View style={s.statBox}>
+            <Text style={s.statValue}>{plan?.exercises.reduce((sum, e) => sum + e.sets, 0)}</Text>
+            <Text style={s.statLabel}>Serie totali</Text>
+          </View>
+          <View style={s.statBox}>
+            <Text style={s.statValue}>{Math.round((plan?.exercises.reduce((sum, e) => sum + e.rest_seconds * e.sets, 0) ?? 0) / 60)}m</Text>
+            <Text style={s.statLabel}>Riposo est.</Text>
           </View>
         </View>
-      ))}
+      </Animated.View>
 
-      <TouchableOpacity
-        style={s.startButton}
-        onPress={() => router.push({ pathname: '/(athlete)/session', params: { planId: plan?.id } })}
-      >
-        <Text style={s.startButtonText}>▶ Inizia sessione</Text>
-      </TouchableOpacity>
+      <Animated.View style={{ opacity: exercisesAnim, transform: [{ translateY: exercisesAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
+      {(() => {
+        const days = Array.from(new Set((plan?.exercises ?? []).map(e => e.day_index))).sort((a, b) => a - b);
+        const multiDay = days.length > 1;
+        return days.map(day => {
+          const dayExercises = (plan?.exercises ?? []).filter(e => e.day_index === day);
+          return (
+            <View key={day}>
+              {multiDay && <Text style={s.sectionTitle}>Giorno {day}</Text>}
+              {!multiDay && <Text style={s.sectionTitle}>Esercizi</Text>}
+              {dayExercises.map((exercise, index) => (
+                <View key={exercise.id} style={s.exerciseCard}>
+                  <View style={s.exerciseLeft}>
+                    <Text style={s.exerciseIndex}>{index + 1}</Text>
+                  </View>
+                  <View style={s.exerciseBody}>
+                    <View style={s.exerciseNameRow}>
+                      <Text style={s.exerciseName}>{exercise.name}</Text>
+                      {exercise.catalog_exercise_id && (
+                        <TouchableOpacity
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          onPress={() => {
+                            const cat = (exercise as any).exercise_catalog;
+                            if (cat) setInfoExercise({ name: exercise.name, muscle_group: cat.muscle_group, equipment: cat.equipment, difficulty: cat.difficulty, description: cat.description, video_url: cat.video_url });
+                          }}
+                        >
+                          <Text style={s.infoBtn}>ℹ️</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    {exercise.muscle_group && <Text style={s.muscleGroup}>{exercise.muscle_group}</Text>}
+                    <View style={s.pillRow}>
+                      <StatPill label="Serie" value={`${exercise.sets}`} colors={colors} />
+                      <StatPill label="Reps" value={`${exercise.reps}`} colors={colors} />
+                      <StatPill label="Riposo" value={`${exercise.rest_seconds}s`} colors={colors} />
+                    </View>
+                    {exercise.has_dropset && (
+                      <View style={s.techniqueBadge}>
+                        <View style={[s.techniqueIndicator, { backgroundColor: colors.accent }]} />
+                        <Text style={s.techniqueText}>Dropset -{exercise.dropset_percentage}%</Text>
+                      </View>
+                    )}
+                    {exercise.has_backoff && (
+                      <View style={s.techniqueBadge}>
+                        <View style={[s.techniqueIndicator, { backgroundColor: '#2196F3' }]} />
+                        <Text style={s.techniqueText}>Backoff -{exercise.backoff_percentage}%</Text>
+                      </View>
+                    )}
+                    {exercise.notes && <Text style={s.exerciseNotes}>📝 {exercise.notes}</Text>}
+                  </View>
+                </View>
+              ))}
+              <TouchableOpacity
+                style={s.startButton}
+                onPress={() => router.push({ pathname: '/(athlete)/session', params: { planId: plan?.id, dayIndex: String(day) } })}
+              >
+                <Text style={s.startButtonText}>▶ {multiDay ? `Inizia Giorno ${day}` : 'Inizia sessione'}</Text>
+              </TouchableOpacity>
+              {multiDay && <View style={{ height: 24 }} />}
+            </View>
+          );
+        });
+      })()}
+      </Animated.View>
 
     </ScrollView>
 

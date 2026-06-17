@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { ThemeProvider } from '../context/ThemeContext';
+import { AlertProvider } from '../context/AlertContext';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -46,7 +47,9 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <Slot />
+      <AlertProvider>
+        <Slot />
+      </AlertProvider>
     </ThemeProvider>
   );
 }

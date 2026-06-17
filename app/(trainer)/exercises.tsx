@@ -1,13 +1,14 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ActivityIndicator, Alert, Modal, TextInput, ScrollView, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Modal, TextInput, ScrollView, KeyboardAvoidingView, Platform, Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../hooks/useProfile';
 import { useTheme } from '@/context/ThemeContext';
+import { useAlert } from '@/context/AlertContext';
 
 type CustomExercise = {
   id: string;
@@ -29,10 +30,23 @@ export default function MyExercisesScreen() {
   const router = useRouter();
   const { profile } = useProfile();
   const { colors } = useTheme();
+  const { showAlert } = useAlert();
   const s = makeStyles(colors);
 
   const [exercises, setExercises] = useState<CustomExercise[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const topBarAnim = useRef(new Animated.Value(0)).current;
+  const listAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!loading) {
+      Animated.stagger(120, [
+        Animated.timing(topBarAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(listAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [loading]);
 
   // Modal state (create/edit)
   const [modalVisible, setModalVisible] = useState(false);
@@ -75,7 +89,7 @@ export default function MyExercisesScreen() {
 
   const handleSave = async () => {
     if (!name.trim() || !muscle || !equipment.trim()) {
-      Alert.alert('Attenzione', 'Nome, gruppo muscolare e attrezzatura sono obbligatori.');
+      showAlert({ title: 'Attenzione', message: 'Nome, gruppo muscolare e attrezzatura sono obbligatori.' });
       return;
     }
     setSaving(true);
@@ -97,16 +111,16 @@ export default function MyExercisesScreen() {
     }
 
     setSaving(false);
-    if (error) { Alert.alert('Errore', error.message); return; }
+    if (error) { showAlert({ title: 'Errore', message: error.message }); return; }
     setModalVisible(false);
     fetchExercises();
   };
 
   const handleDelete = (ex: CustomExercise) => {
-    Alert.alert(
-      'Elimina esercizio',
-      `Eliminare "${ex.name}"? Non sarà più disponibile nelle schede future.`,
-      [
+    showAlert({
+      title: 'Elimina esercizio',
+      message: `Eliminare "${ex.name}"? Non sarà più disponibile nelle schede future.`,
+      buttons: [
         { text: 'Annulla', style: 'cancel' },
         {
           text: 'Elimina', style: 'destructive',
@@ -115,8 +129,8 @@ export default function MyExercisesScreen() {
             fetchExercises();
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const renderExercise = ({ item }: { item: CustomExercise }) => (
@@ -147,28 +161,33 @@ export default function MyExercisesScreen() {
 
   return (
     <View style={s.container}>
-      <View style={s.topBar}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>‹ Profilo</Text>
-        </TouchableOpacity>
-        <Text style={s.title}>I miei esercizi</Text>
-        <TouchableOpacity style={s.addBtn} onPress={openCreate}>
-          <Text style={s.addBtnText}>+ Nuovo</Text>
-        </TouchableOpacity>
-      </View>
+      <Animated.View style={{ opacity: topBarAnim, transform: [{ translateY: topBarAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
+        <View style={s.topBar}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={s.backText}>‹ Profilo</Text>
+          </TouchableOpacity>
+          <Text style={s.title}>I miei esercizi</Text>
+          <TouchableOpacity style={s.addBtn} onPress={openCreate}>
+            <Text style={s.addBtnText}>+ Nuovo</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
 
       {loading ? (
         <View style={s.centered}><ActivityIndicator color={colors.accent} size="large" /></View>
       ) : exercises.length === 0 ? (
-        <View style={s.centered}>
-          <Text style={s.emptyIcon}>💪</Text>
-          <Text style={s.emptyTitle}>Nessun esercizio custom</Text>
-          <Text style={s.emptySubtitle}>Crea il tuo primo esercizio personalizzato</Text>
-          <TouchableOpacity style={s.emptyBtn} onPress={openCreate}>
-            <Text style={s.emptyBtnText}>+ Crea esercizio</Text>
-          </TouchableOpacity>
-        </View>
+        <Animated.View style={[{ flex: 1 }, { opacity: listAnim, transform: [{ translateY: listAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }]}>
+          <View style={s.centered}>
+            <Text style={s.emptyIcon}>💪</Text>
+            <Text style={s.emptyTitle}>Nessun esercizio custom</Text>
+            <Text style={s.emptySubtitle}>Crea il tuo primo esercizio personalizzato</Text>
+            <TouchableOpacity style={s.emptyBtn} onPress={openCreate}>
+              <Text style={s.emptyBtnText}>+ Crea esercizio</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
       ) : (
+        <Animated.View style={[{ flex: 1 }, { opacity: listAnim, transform: [{ translateY: listAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }]}>
         <FlatList
           data={exercises}
           keyExtractor={item => item.id}
@@ -176,6 +195,7 @@ export default function MyExercisesScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         />
+        </Animated.View>
       )}
 
       {/* Modal crea/modifica */}
@@ -252,7 +272,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   container: { flex: 1, backgroundColor: c.bg },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 60, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: c.border },
   backText: { color: c.accent, fontSize: 16 },
-  title: { fontSize: 17, fontWeight: '800', color: c.text },
+  title: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '800', color: c.text },
   addBtn: { backgroundColor: c.accentBg, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: c.accentBorder },
   addBtnText: { color: c.accent, fontSize: 13, fontWeight: '700' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },

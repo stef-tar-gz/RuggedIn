@@ -1,16 +1,32 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  ActivityIndicator, TouchableOpacity, Alert
+  ActivityIndicator, TouchableOpacity, Animated
 } from 'react-native';
+import { ScalePressable } from '@/components/ScalePressable';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
+import { useAlert } from '@/context/AlertContext';
+
+const GOAL_LABELS: Record<string, string> = {
+  weight_loss: '⚖️ Dimagrimento',
+  muscle_gain: '💪 Massa muscolare',
+  strength: '🏋️ Forza',
+  endurance: '🏃 Resistenza',
+  wellness: '🧘 Benessere',
+};
+const LEVEL_LABELS: Record<string, string> = {
+  beginner: '🌱 Principiante',
+  intermediate: '📈 Intermedio',
+  advanced: '🔥 Avanzato',
+};
 
 type AthleteProfile = {
   id: string; full_name: string; avatar_url: string | null;
   bio: string | null; height_cm: number | null; weight_kg: number | null; notes: string | null;
+  goal: string | null; experience_level: string | null; days_per_week: number | null; about_me: string | null;
 };
 type WorkoutPlan = { id: string; name: string; description: string | null; is_active: boolean; created_at: string };
 type NutritionPlan = { id: string; plan_date: string; calories: number; carbs_g: number; protein_g: number; fat_g: number; notes: string | null };
@@ -19,6 +35,7 @@ export default function AthleteProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors } = useTheme();
+  const { showAlert } = useAlert();
 
   const [athlete, setAthlete] = useState<AthleteProfile | null>(null);
   const [workoutPlans, setWorkoutPlans] = useState<WorkoutPlan[]>([]);
@@ -26,8 +43,21 @@ export default function AthleteProfileScreen() {
   const [loading, setLoading] = useState(true);
 
   const s = makeStyles(colors);
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  const section1Anim = useRef(new Animated.Value(0)).current;
+  const section2Anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => { fetchAll(); }, [id]);
+
+  useEffect(() => {
+    if (!loading) {
+      Animated.stagger(120, [
+        Animated.timing(headerAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(section1Anim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(section2Anim, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [loading]);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -51,10 +81,10 @@ export default function AthleteProfileScreen() {
   };
 
   const handleRemoveAthlete = () => {
-    Alert.alert(
-      'Rimuovi atleta',
-      `Vuoi rimuovere ${athlete?.full_name} dalla tua lista? Tutte le schede assegnate verranno eliminate.`,
-      [
+    showAlert({
+      title: 'Rimuovi atleta',
+      message: `Vuoi rimuovere ${athlete?.full_name} dalla tua lista? Tutte le schede assegnate verranno eliminate.`,
+      buttons: [
         { text: 'Annulla', style: 'cancel' },
         {
           text: 'Rimuovi', style: 'destructive',
@@ -65,7 +95,7 @@ export default function AthleteProfileScreen() {
               .delete()
               .eq('athlete_id', id);
             if (plansError) {
-              Alert.alert('Errore', `Eliminazione schede: ${plansError.message}`);
+              showAlert({ title: 'Errore', message: `Eliminazione schede: ${plansError.message}` });
               return;
             }
 
@@ -75,7 +105,7 @@ export default function AthleteProfileScreen() {
               .delete()
               .eq('athlete_id', id);
             if (relError) {
-              Alert.alert('Errore', `Rimozione relazione: ${relError.message}`);
+              showAlert({ title: 'Errore', message: `Rimozione relazione: ${relError.message}` });
               return;
             }
 
@@ -88,22 +118,26 @@ export default function AthleteProfileScreen() {
             router.back();
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const handleDeletePlan = (planId: string, planName: string) => {
-    Alert.alert('Elimina scheda', `Vuoi eliminare "${planName}"? Questa azione non può essere annullata.`, [
-      { text: 'Annulla', style: 'cancel' },
-      {
-        text: 'Elimina', style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase.from('workout_plans').delete().eq('id', planId);
-          if (error) Alert.alert('Errore', error.message);
-          else setWorkoutPlans(prev => prev.filter(p => p.id !== planId));
-        }
-      }
-    ]);
+    showAlert({
+      title: 'Elimina scheda',
+      message: `Vuoi eliminare "${planName}"? Questa azione non può essere annullata.`,
+      buttons: [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina', style: 'destructive',
+          onPress: async () => {
+            const { error } = await supabase.from('workout_plans').delete().eq('id', planId);
+            if (error) showAlert({ title: 'Errore', message: error.message });
+            else setWorkoutPlans(prev => prev.filter(p => p.id !== planId));
+          },
+        },
+      ],
+    });
   };
 
   if (loading) {
@@ -117,7 +151,7 @@ export default function AthleteProfileScreen() {
         <Text style={s.backText}>‹ Dashboard</Text>
       </TouchableOpacity>
 
-      <View style={s.profileHeader}>
+      <Animated.View style={[s.profileHeader, { opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}>
         {athlete?.avatar_url ? (
           <Image source={{ uri: athlete.avatar_url }} style={s.avatar} contentFit="cover" transition={200} />
         ) : (
@@ -150,8 +184,38 @@ export default function AthleteProfileScreen() {
             <Text style={s.notesText}>{athlete.notes}</Text>
           </View>
         )}
-      </View>
 
+        {(athlete?.goal || athlete?.experience_level || athlete?.days_per_week || athlete?.about_me) && (
+          <View style={s.goalsCard}>
+            <Text style={s.goalsTitle}>🎯 Obiettivi e contesto</Text>
+            <View style={s.goalsBadgeRow}>
+              {athlete.goal && (
+                <View style={s.goalsBadge}>
+                  <Text style={s.goalsBadgeText}>{GOAL_LABELS[athlete.goal] ?? athlete.goal}</Text>
+                </View>
+              )}
+              {athlete.experience_level && (
+                <View style={s.goalsBadge}>
+                  <Text style={s.goalsBadgeText}>{LEVEL_LABELS[athlete.experience_level] ?? athlete.experience_level}</Text>
+                </View>
+              )}
+              {athlete.days_per_week && (
+                <View style={s.goalsBadge}>
+                  <Text style={s.goalsBadgeText}>📅 {athlete.days_per_week}g/settimana</Text>
+                </View>
+              )}
+            </View>
+            {athlete.about_me && (
+              <>
+                <Text style={s.aboutMeLabel}>Parole dell'atleta</Text>
+                <Text style={s.aboutMeText}>{athlete.about_me}</Text>
+              </>
+            )}
+          </View>
+        )}
+      </Animated.View>
+
+      <Animated.View style={{ opacity: section1Anim, transform: [{ translateY: section1Anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }}>
       <View style={s.section}>
         <Text style={s.sectionTitle}>Piano alimentare</Text>
         {nutrition ? (
@@ -169,7 +233,9 @@ export default function AthleteProfileScreen() {
           <Text style={s.emptyText}>Nessun piano alimentare ancora.</Text>
         )}
       </View>
+      </Animated.View>
 
+      <Animated.View style={{ opacity: section2Anim, transform: [{ translateY: section2Anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }}>
       <View style={s.section}>
         <View style={s.sectionHeader}>
           <Text style={s.sectionTitle}>Schede allenamento</Text>
@@ -182,7 +248,7 @@ export default function AthleteProfileScreen() {
           <Text style={s.emptyText}>Nessuna scheda ancora.</Text>
         ) : (
           workoutPlans.map((plan) => (
-            <TouchableOpacity
+            <ScalePressable
               key={plan.id}
               style={s.planCard}
               onPress={() => router.push({ pathname: '/(trainer)/workout/[id]', params: { id: plan.id } })}
@@ -202,18 +268,19 @@ export default function AthleteProfileScreen() {
                 <Text style={s.planDate}>📅 {new Date(plan.created_at).toLocaleDateString('it-IT')}</Text>
                 <Text style={s.chevron}>›</Text>
               </View>
-            </TouchableOpacity>
+            </ScalePressable>
           ))
         )}
       </View>
 
-      <TouchableOpacity style={s.progressButton} onPress={() => router.push({ pathname: '/(trainer)/athlete/progress/[id]', params: { id } })}>
+      <ScalePressable style={s.progressButton} onPress={() => router.push({ pathname: '/(trainer)/athlete/progress/[id]', params: { id } })}>
         <Text style={s.progressButtonText}>📈 Vedi progressi atleta</Text>
-      </TouchableOpacity>
+      </ScalePressable>
 
-      <TouchableOpacity style={s.removeButton} onPress={handleRemoveAthlete}>
+      <ScalePressable style={s.removeButton} onPress={handleRemoveAthlete}>
         <Text style={s.removeButtonText}>Rimuovi atleta</Text>
-      </TouchableOpacity>
+      </ScalePressable>
+      </Animated.View>
 
     </ScrollView>
   );
@@ -251,6 +318,13 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   notesCard: { backgroundColor: c.surface, borderRadius: 10, padding: 14, marginTop: 16, width: '100%', borderWidth: 1, borderColor: c.border },
   notesLabel: { color: c.textSecondary, fontSize: 12, marginBottom: 6 },
   notesText: { color: c.techniqueText, fontSize: 14, lineHeight: 20 },
+  goalsCard: { backgroundColor: c.surface, borderRadius: 10, padding: 14, marginTop: 12, width: '100%', borderWidth: 1, borderColor: c.accentBorder },
+  goalsTitle: { color: c.accent, fontSize: 13, fontWeight: '700', marginBottom: 10 },
+  goalsBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  goalsBadge: { backgroundColor: c.accentBg, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  goalsBadgeText: { color: c.accent, fontSize: 13, fontWeight: '600' },
+  aboutMeLabel: { color: c.textSecondary, fontSize: 12, marginBottom: 6 },
+  aboutMeText: { color: c.techniqueText, fontSize: 14, lineHeight: 20 },
   section: { marginBottom: 32 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 12 },

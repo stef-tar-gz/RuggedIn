@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  ActivityIndicator, TouchableOpacity, Platform, Dimensions, Alert
+  ActivityIndicator, TouchableOpacity, Platform, Dimensions, Animated
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../hooks/useProfile';
 import { useTheme } from '@/context/ThemeContext';
+import { useAlert } from '@/context/AlertContext';
 import {
   VictoryLine, VictoryChart, VictoryAxis,
   VictoryScatter, VictoryTheme
@@ -33,6 +34,7 @@ export default function ProgressScreen() {
   const { profile } = useProfile();
   const { colors } = useTheme();
   const router = useRouter();
+  const { showAlert } = useAlert();
 
   const [exercises, setExercises] = useState<string[]>([]);
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
@@ -46,9 +48,25 @@ export default function ProgressScreen() {
 
   const s = makeStyles(colors);
 
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  const periodAnim = useRef(new Animated.Value(0)).current;
+  const chipsAnim = useRef(new Animated.Value(0)).current;
+  const resultsAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     if (profile) fetchExercises();
   }, [profile]);
+
+  useEffect(() => {
+    if (!loading) {
+      Animated.stagger(120, [
+        Animated.timing(headerAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(periodAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(chipsAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(resultsAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [loading]);
 
   const fetchExercises = async () => {
     const { data } = await supabase.rpc('get_athlete_exercises', { p_athlete_id: profile!.id });
@@ -89,21 +107,25 @@ export default function ProgressScreen() {
   };
 
   const handleDeleteSession = (date: string) => {
-    Alert.alert('Elimina sessione', `Vuoi eliminare la sessione del ${formatDate(date)}?`, [
-      { text: 'Annulla', style: 'cancel' },
-      {
-        text: 'Elimina', style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase
-            .from('workout_logs')
-            .delete()
-            .eq('athlete_id', profile!.id)
-            .eq('log_date', date);
-          if (error) Alert.alert('Errore', error.message);
-          else setLogs(prev => prev.filter(l => l.date !== date));
-        }
-      }
-    ]);
+    showAlert({
+      title: 'Elimina sessione',
+      message: `Vuoi eliminare la sessione del ${formatDate(date)}?`,
+      buttons: [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina', style: 'destructive',
+          onPress: async () => {
+            const { error } = await supabase
+              .from('workout_logs')
+              .delete()
+              .eq('athlete_id', profile!.id)
+              .eq('log_date', date);
+            if (error) showAlert({ title: 'Errore', message: error.message });
+            else setLogs(prev => prev.filter(l => l.date !== date));
+          },
+        },
+      ],
+    });
   };
 
   const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('it-IT');
@@ -121,13 +143,16 @@ export default function ProgressScreen() {
   return (
     <ScrollView style={s.container} contentContainerStyle={s.content}>
 
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>‹ Schede</Text>
-        </TouchableOpacity>
-        <Text style={s.title}>I miei progressi</Text>
-      </View>
+      <Animated.View style={{ opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
+        <View style={s.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={s.backText}>‹ Schede</Text>
+          </TouchableOpacity>
+          <View style={s.titleWrap} pointerEvents="none"><Text style={s.title}>I miei progressi</Text></View>
+        </View>
+      </Animated.View>
 
+      <Animated.View style={{ opacity: periodAnim, transform: [{ translateY: periodAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
       <View style={s.section}>
         <Text style={s.sectionTitle}>Periodo</Text>
         <View style={s.dateRow}>
@@ -193,7 +218,9 @@ export default function ProgressScreen() {
           </View>
         )}
       </View>
+      </Animated.View>
 
+      <Animated.View style={{ opacity: chipsAnim, transform: [{ translateY: chipsAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
       <View style={s.section}>
         <Text style={s.sectionTitle}>Esercizio</Text>
         {exercises.length === 0 ? (
@@ -214,7 +241,9 @@ export default function ProgressScreen() {
           </ScrollView>
         )}
       </View>
+      </Animated.View>
 
+      <Animated.View style={{ opacity: resultsAnim, transform: [{ translateY: resultsAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
       {selectedExercise && (
         <>
           {searching ? (
@@ -317,6 +346,7 @@ export default function ProgressScreen() {
           )}
         </>
       )}
+      </Animated.View>
     </ScrollView>
   );
 }
@@ -325,9 +355,10 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   container: { flex: 1, backgroundColor: c.bg },
   content: { paddingHorizontal: 24, paddingTop: 60, paddingBottom: 48 },
   centered: { flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 32 },
+  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 32 },
   backText: { color: c.accent, fontSize: 16 },
-  title: { fontSize: 22, fontWeight: '800', color: c.text },
+  titleWrap: { position: 'absolute', left: 0, right: 0 },
+  title: { textAlign: 'center', fontSize: 22, fontWeight: '800', color: c.text },
   section: { marginBottom: 32 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: c.textSecondary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },
   dateRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-end' },

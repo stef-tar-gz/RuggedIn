@@ -36,19 +36,19 @@ export const darkColors: Colors = {
 };
 
 export const lightColors: Colors = {
-  bg: '#f4f4f4',
-  surface: '#ffffff',
-  surfaceElevated: '#eeeeee',
-  border: '#e0e0e0',
-  text: '#111111',
-  textSecondary: '#555555',
-  textMuted: '#999999',
+  bg: '#D9D5D0',
+  surface: '#E3DFD9',
+  surfaceElevated: '#CEC9C3',
+  border: '#BCB7B0',
+  text: '#1C1917',
+  textSecondary: '#524E4B',
+  textMuted: '#857F7C',
   accent: '#E8533A',
-  accentBg: '#E8533A15',
+  accentBg: '#E8533A1A',
   accentBorder: '#E8533A55',
-  accentActiveBg: '#fde8e4',
-  successBg: '#e8f5e9',
-  techniqueText: '#444444',
+  accentActiveBg: '#EDD5CF',
+  successBg: '#CDE8CE',
+  techniqueText: '#333030',
 };
 
 type ThemeContextValue = {

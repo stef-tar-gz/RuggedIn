@@ -1,206 +1,295 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList,
-  TouchableOpacity, ActivityIndicator, Alert
+  View, Text, StyleSheet, ScrollView,
+  TouchableOpacity, ActivityIndicator, Animated,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Image } from 'expo-image';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../hooks/useProfile';
+import { useTheme } from '@/context/ThemeContext';
+import { ScalePressable } from '@/components/ScalePressable';
 
-type Athlete = {
+type ActivePlan = {
   id: string;
-  full_name: string;
-  athlete_id: string;
+  name: string;
+  description: string | null;
+  exercise_count: number;
 };
 
-export default function TrainerDashboard() {
-  const { profile, loading: profileLoading } = useProfile();
-  const [athletes, setAthletes] = useState<Athlete[]>([]);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
+type TrainerInfo = {
+  full_name: string;
+  avatar_url: string | null;
+};
 
-  useEffect(() => {
-    if (profile) fetchAthletes();
+const DAYS_IT = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+const MONTHS_IT = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+
+const GOAL_LABELS: Record<string, string> = {
+  weight_loss: '⚖️ Dimagrimento',
+  muscle_gain: '💪 Massa muscolare',
+  strength: '🏋️ Forza',
+  endurance: '🏃 Resistenza',
+  wellness: '🧘 Benessere',
+};
+
+export default function AthleteDashboard() {
+  const { profile, loading: profileLoading, refetch } = useProfile();
+  const { colors } = useTheme();
+  const router = useRouter();
+  const s = makeStyles(colors);
+
+  const [activePlan, setActivePlan] = useState<ActivePlan | null>(null);
+  const [planCount, setPlanCount] = useState(0);
+  const [trainer, setTrainer] = useState<TrainerInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  const now = new Date();
+  const dateLabel = `${DAYS_IT[now.getDay()]} ${now.getDate()} ${MONTHS_IT[now.getMonth()]}`;
+
+  const fetchData = useCallback(async () => {
+    if (!profile) return;
+
+    const [plansRes, trainerRelRes] = await Promise.all([
+      supabase
+        .from('workout_plans')
+        .select('id, name, description, is_active, exercises(id)')
+        .eq('athlete_id', profile.id)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('trainer_athlete')
+        .select('trainer_id')
+        .eq('athlete_id', profile.id)
+        .maybeSingle(),
+    ]);
+
+    const plans = plansRes.data ?? [];
+    setPlanCount(plans.length);
+    const active = plans.find((p: any) => p.is_active);
+    if (active) {
+      setActivePlan({
+        id: active.id,
+        name: active.name,
+        description: active.description,
+        exercise_count: active.exercises?.length ?? 0,
+      });
+    } else {
+      setActivePlan(null);
+    }
+
+    if (trainerRelRes.data?.trainer_id) {
+      const { data: tp } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url')
+        .eq('id', trainerRelRes.data.trainer_id)
+        .single();
+      setTrainer(tp ?? null);
+    } else {
+      setTrainer(null);
+    }
+
+    setLoading(false);
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, tension: 80, friction: 10, useNativeDriver: true }),
+    ]).start();
   }, [profile]);
 
-  const fetchAthletes = async () => {
-    const { data, error } = await supabase.rpc('get_my_athletes');
-    if (error) {
-      Alert.alert('Errore', error.message);
-    } else {
-      setAthletes(data || []);
-    }
-    setLoading(false);
-  };
+  useFocusEffect(useCallback(() => {
+    refetch();
+    setLoading(true);
+    fadeAnim.setValue(0);
+    slideAnim.setValue(20);
+  }, []));
 
-  const handleAddAthlete = async () => {
-    Alert.prompt(
-      'Aggiungi Atleta',
-      'Inserisci l\'email dell\'atleta',
-      async (email) => {
-        if (!email) return;
+  useEffect(() => {
+    if (profile) fetchData();
+  }, [profile]);
 
-        const { data: authData, error: authError } = await supabase
-          .rpc('get_profile_by_email', { p_email: email });
-
-        if (authError || !authData || authData.length === 0) {
-          Alert.alert('Errore', 'Atleta non trovato. Verifica l\'email.');
-          return;
-        }
-
-        const athlete = authData[0];
-
-        const { error } = await supabase
-          .from('trainer_athlete')
-          .insert({
-            trainer_id: profile!.id,
-            athlete_id: athlete.id,
-          });
-
-        if (error) {
-          Alert.alert('Errore', error.message);
-        } else {
-          Alert.alert('Successo', `${athlete.full_name} aggiunto!`);
-          fetchAthletes();
-        }
-      },
-      'plain-text'
-    );
-  };
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Sei sicuro di voler uscire?',
-      [
-        { text: 'Annulla', style: 'cancel' },
-        { text: 'Esci', style: 'destructive', onPress: () => supabase.auth.signOut() }
-      ]
-    );
-  };
+  const goal = (profile as any)?.goal;
+  const avatarUrl = profile?.avatar_url ?? null;
 
   if (profileLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator color="#E8533A" size="large" />
-      </View>
-    );
+    return <View style={s.centered}><ActivityIndicator color={colors.accent} size="large" /></View>;
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Ciao,</Text>
-          <Text style={styles.name}>{profile?.full_name} 💪</Text>
-        </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={styles.profileButton}
-            onPress={() => router.push('/(trainer)/profile')}
-          >
-            <Text style={styles.profileButtonText}>👤</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleLogout}>
-            <Text style={styles.logout}>Esci</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+    <ScrollView style={s.container} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
 
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>I tuoi atleti</Text>
-          <TouchableOpacity style={styles.addButton} onPress={handleAddAthlete}>
-            <Text style={styles.addButtonText}>+ Aggiungi</Text>
-          </TouchableOpacity>
+      {/* Header */}
+      <View style={s.header}>
+        <View style={s.headerLeft}>
+          <Text style={s.dateLabel}>{dateLabel}</Text>
+          <Text style={s.greeting}>Ciao, {profile?.full_name?.split(' ')[0]} 👋</Text>
         </View>
-
-        {loading ? (
-          <ActivityIndicator color="#E8533A" style={{ marginTop: 24 }} />
-        ) : athletes.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>Nessun atleta ancora.</Text>
-            <Text style={styles.emptySubtext}>Aggiungi il tuo primo atleta!</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={athletes}
-            keyExtractor={(item) => item.athlete_id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.athleteCard}
-                onPress={() => router.push({
-                  pathname: '/(trainer)/athlete/[id]',
-                  params: { id: item.athlete_id }
-                })}
-              >
-                <View style={styles.athleteAvatar}>
-                  <Text style={styles.athleteAvatarText}>
-                    {item.full_name.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.athleteName}>{item.full_name}</Text>
-                  <Text style={styles.athleteSub}>Tocca per vedere il profilo</Text>
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </TouchableOpacity>
+        <ScalePressable onPress={() => router.push('/(athlete)/profile')}>
+          <View style={s.avatarWrap}>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={s.avatar} contentFit="cover" />
+            ) : (
+              <View style={s.avatarPlaceholder}>
+                <Text style={s.avatarInitial}>{profile?.full_name?.charAt(0).toUpperCase()}</Text>
+              </View>
             )}
-          />
-        )}
+          </View>
+        </ScalePressable>
       </View>
-    </View>
+
+      {loading ? (
+        <ActivityIndicator color={colors.accent} style={{ marginTop: 48 }} />
+      ) : (
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+
+          {/* Hero — scheda attiva */}
+          <View style={s.heroCard}>
+            <Text style={s.heroLabel}>SCHEDA ATTIVA</Text>
+            {activePlan ? (
+              <ScalePressable onPress={() => router.push({ pathname: '/(athlete)/plan/[id]', params: { id: activePlan.id } })}>
+                <View style={s.heroContent}>
+                  <Text style={s.heroPlanName}>{activePlan.name}</Text>
+                  {activePlan.description ? (
+                    <Text style={s.heroPlanDesc} numberOfLines={2}>{activePlan.description}</Text>
+                  ) : null}
+                  <View style={s.heroBadgeRow}>
+                    <View style={s.heroBadge}>
+                      <Text style={s.heroBadgeText}>💪 {activePlan.exercise_count} esercizi</Text>
+                    </View>
+                    <View style={s.heroBadge}>
+                      <Text style={s.heroBadgeText}>📋 {planCount} schede totali</Text>
+                    </View>
+                  </View>
+                  <View style={s.heroAction}>
+                    <Text style={s.heroActionText}>Apri scheda →</Text>
+                  </View>
+                </View>
+              </ScalePressable>
+            ) : (
+              <View style={s.heroEmpty}>
+                <Text style={s.heroEmptyIcon}>📭</Text>
+                <Text style={s.heroEmptyText}>Nessuna scheda attiva</Text>
+                <Text style={s.heroEmptySub}>Il tuo trainer non ha ancora assegnato una scheda</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Obiettivo */}
+          {goal && (
+            <View style={s.goalCard}>
+              <Text style={s.goalLabel}>IL TUO OBIETTIVO</Text>
+              <Text style={s.goalValue}>{GOAL_LABELS[goal] ?? goal}</Text>
+            </View>
+          )}
+
+          {/* Accessi rapidi */}
+          <Text style={s.sectionTitle}>Accesso rapido</Text>
+          <View style={s.quickRow}>
+            <ScalePressable style={s.quickCard} onPress={() => router.push('/(athlete)/plans')}>
+              <Text style={s.quickIcon}>📋</Text>
+              <Text style={s.quickLabel}>Le mie schede</Text>
+              <Text style={s.quickSub}>{planCount} totali</Text>
+            </ScalePressable>
+            <ScalePressable style={s.quickCard} onPress={() => router.push('/(athlete)/progress')}>
+              <Text style={s.quickIcon}>📈</Text>
+              <Text style={s.quickLabel}>Progressi</Text>
+              <Text style={s.quickSub}>Grafici & log</Text>
+            </ScalePressable>
+          </View>
+
+          {/* Trainer */}
+          <Text style={s.sectionTitle}>Il mio Trainer</Text>
+          {trainer ? (
+            <ScalePressable onPress={() => router.push('/(athlete)/find-trainer')}>
+              <View style={s.trainerCard}>
+                {trainer.avatar_url ? (
+                  <Image source={{ uri: trainer.avatar_url }} style={s.trainerAvatar} contentFit="cover" />
+                ) : (
+                  <View style={s.trainerAvatarPlaceholder}>
+                    <Text style={s.trainerInitial}>{trainer.full_name.charAt(0).toUpperCase()}</Text>
+                  </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={s.trainerName}>{trainer.full_name}</Text>
+                  <Text style={s.trainerSub}>Personal Trainer</Text>
+                </View>
+                <Text style={s.trainerChevron}>›</Text>
+              </View>
+            </ScalePressable>
+          ) : (
+            <ScalePressable onPress={() => router.push('/(athlete)/find-trainer')}>
+              <View style={s.findTrainerCard}>
+                <Text style={s.findTrainerIcon}>🔍</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.findTrainerText}>Trova un trainer</Text>
+                  <Text style={s.findTrainerSub}>Connettiti con un personal trainer</Text>
+                </View>
+                <Text style={s.trainerChevron}>›</Text>
+              </View>
+            </ScalePressable>
+          )}
+
+        </Animated.View>
+      )}
+    </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f0f', paddingTop: 60, paddingHorizontal: 24 },
-  centered: { flex: 1, backgroundColor: '#0f0f0f', alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 36 },
-  greeting: { fontSize: 14, color: '#888' },
-  name: { fontSize: 24, fontWeight: '800', color: '#fff' },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  profileButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#1a1a1a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
-  profileButtonText: { fontSize: 16 },
-  logout: { color: '#E8533A', fontSize: 14, fontWeight: '600' },
-  section: { flex: 1 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
-  addButton: { backgroundColor: '#E8533A', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
-  addButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { color: '#fff', fontSize: 16, fontWeight: '600', marginBottom: 4 },
-  emptySubtext: { color: '#888', fontSize: 14 },
-  athleteCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
-  athleteAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#E8533A22',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  athleteAvatarText: { color: '#E8533A', fontSize: 18, fontWeight: '800' },
-  athleteName: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  athleteSub: { color: '#888', fontSize: 12, marginTop: 2 },
-  chevron: { color: '#888', fontSize: 24 },
+const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg },
+  content: { paddingHorizontal: 24, paddingTop: 64, paddingBottom: 48 },
+  centered: { flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' },
+
+  // Header
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 },
+  headerLeft: {},
+  dateLabel: { fontSize: 12, color: c.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
+  greeting: { fontSize: 24, fontWeight: '800', color: c.text, marginTop: 2 },
+  avatarWrap: { borderRadius: 24, borderWidth: 2, borderColor: c.accent },
+  avatar: { width: 46, height: 46, borderRadius: 23 },
+  avatarPlaceholder: { width: 46, height: 46, borderRadius: 23, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { color: c.accent, fontSize: 20, fontWeight: '800' },
+
+  // Hero card
+  heroCard: { backgroundColor: c.surface, borderRadius: 18, padding: 20, marginBottom: 14, borderWidth: 1, borderColor: c.accentBorder },
+  heroLabel: { fontSize: 10, fontWeight: '800', color: c.accent, letterSpacing: 1.5, marginBottom: 12 },
+  heroContent: {},
+  heroPlanName: { fontSize: 20, fontWeight: '800', color: c.text, marginBottom: 6 },
+  heroPlanDesc: { fontSize: 13, color: c.textSecondary, marginBottom: 14, lineHeight: 18 },
+  heroBadgeRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  heroBadge: { backgroundColor: c.accentBg, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
+  heroBadgeText: { color: c.accent, fontSize: 12, fontWeight: '600' },
+  heroAction: { alignSelf: 'flex-start', borderBottomWidth: 1, borderBottomColor: c.accent },
+  heroActionText: { color: c.accent, fontSize: 14, fontWeight: '700', paddingBottom: 1 },
+  heroEmpty: { alignItems: 'center', paddingVertical: 20 },
+  heroEmptyIcon: { fontSize: 32, marginBottom: 8 },
+  heroEmptyText: { color: c.text, fontSize: 15, fontWeight: '700', marginBottom: 4 },
+  heroEmptySub: { color: c.textMuted, fontSize: 13, textAlign: 'center' },
+
+  // Goal
+  goalCard: { backgroundColor: c.accentBg, borderRadius: 14, paddingHorizontal: 18, paddingVertical: 14, marginBottom: 28, borderWidth: 1, borderColor: c.accentBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  goalLabel: { fontSize: 10, fontWeight: '800', color: c.accent, letterSpacing: 1.5 },
+  goalValue: { fontSize: 15, fontWeight: '700', color: c.accent },
+
+  // Quick access
+  sectionTitle: { fontSize: 13, fontWeight: '700', color: c.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
+  quickRow: { flexDirection: 'row', gap: 12, marginBottom: 28 },
+  quickCard: { flex: 1, backgroundColor: c.surface, borderRadius: 16, padding: 18, borderWidth: 1, borderColor: c.border },
+  quickIcon: { fontSize: 26, marginBottom: 10 },
+  quickLabel: { fontSize: 14, fontWeight: '700', color: c.text, marginBottom: 2 },
+  quickSub: { fontSize: 12, color: c.textMuted },
+
+  // Trainer
+  trainerCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: c.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: c.border },
+  trainerAvatar: { width: 50, height: 50, borderRadius: 25 },
+  trainerAvatarPlaceholder: { width: 50, height: 50, borderRadius: 25, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center' },
+  trainerInitial: { color: c.accent, fontSize: 20, fontWeight: '800' },
+  trainerName: { fontSize: 15, fontWeight: '700', color: c.text },
+  trainerSub: { fontSize: 12, color: c.textMuted, marginTop: 2 },
+  trainerChevron: { color: c.textMuted, fontSize: 22 },
+  findTrainerCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: c.accentBg, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: c.accentBorder },
+  findTrainerIcon: { fontSize: 24 },
+  findTrainerText: { fontSize: 15, fontWeight: '700', color: c.accent },
+  findTrainerSub: { fontSize: 12, color: c.accent, opacity: 0.7, marginTop: 2 },
 });

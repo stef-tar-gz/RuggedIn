@@ -1,0 +1,167 @@
+import { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { useRouter } from 'expo-router';
+import { supabase } from '../../lib/supabase';
+import { useTheme } from '@/context/ThemeContext';
+import { useAlert } from '@/context/AlertContext';
+
+export default function TrainerSettingsScreen() {
+  const router = useRouter();
+  const { colors, isDark, toggleTheme } = useTheme();
+  const { showAlert } = useAlert();
+  const s = makeStyles(colors);
+
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [profileVisible, setProfileVisible] = useState(true);
+
+  const handleDeleteAccount = () => {
+    showAlert({
+      title: 'Elimina account',
+      message: 'Questa azione è irreversibile. Tutti i tuoi dati, atleti e schede create verranno eliminati definitivamente.',
+      buttons: [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina', style: 'destructive',
+          onPress: () => showAlert({
+            title: 'Sei sicuro?',
+            message: "Conferma l'eliminazione definitiva del tuo account.",
+            buttons: [
+              { text: 'Annulla', style: 'cancel' },
+              { text: 'Sì, elimina', style: 'destructive', onPress: () => supabase.auth.signOut() },
+            ],
+          }),
+        },
+      ],
+    });
+  };
+
+  return (
+    <ScrollView style={s.container} contentContainerStyle={s.content}>
+      <View style={s.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={s.backText}>‹ Profilo</Text>
+        </TouchableOpacity>
+        <View style={{ flex: 1 }} pointerEvents="none">
+          <Text style={s.title}>Impostazioni</Text>
+        </View>
+      </View>
+
+      {/* Aspetto */}
+      <Text style={s.groupLabel}>Aspetto</Text>
+      <View style={s.group}>
+        <TouchableOpacity style={s.row} onPress={toggleTheme} activeOpacity={0.7}>
+          <Text style={s.rowIcon}>{isDark ? '🌙' : '☀️'}</Text>
+          <View style={s.rowBody}>
+            <Text style={s.rowLabel}>Tema</Text>
+            <Text style={s.rowSub}>{isDark ? 'Scuro' : 'Chiaro'}</Text>
+          </View>
+          <View style={[s.dot, { backgroundColor: isDark ? colors.textMuted : colors.accent }]} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Notifiche */}
+      <Text style={s.groupLabel}>Notifiche</Text>
+      <View style={s.group}>
+        <View style={s.row}>
+          <Text style={s.rowIcon}>🔔</Text>
+          <View style={s.rowBody}>
+            <Text style={s.rowLabel}>Notifiche push</Text>
+            <Text style={s.rowSub}>Nuove richieste e messaggi dagli atleti</Text>
+          </View>
+          <Switch
+            value={notificationsEnabled}
+            onValueChange={setNotificationsEnabled}
+            trackColor={{ false: colors.border, true: colors.accent + '66' }}
+            thumbColor={notificationsEnabled ? colors.accent : colors.textMuted}
+          />
+        </View>
+      </View>
+
+      {/* Privacy */}
+      <Text style={s.groupLabel}>Privacy</Text>
+      <View style={s.group}>
+        <View style={s.row}>
+          <Text style={s.rowIcon}>👁️</Text>
+          <View style={s.rowBody}>
+            <Text style={s.rowLabel}>Profilo visibile agli atleti</Text>
+            <Text style={s.rowSub}>Gli atleti possono trovarti nella ricerca</Text>
+          </View>
+          <Switch
+            value={profileVisible}
+            onValueChange={setProfileVisible}
+            trackColor={{ false: colors.border, true: colors.accent + '66' }}
+            thumbColor={profileVisible ? colors.accent : colors.textMuted}
+          />
+        </View>
+      </View>
+
+      {/* Info app */}
+      <Text style={s.groupLabel}>Info</Text>
+      <View style={s.group}>
+        <View style={[s.row]}>
+          <Text style={s.rowIcon}>📱</Text>
+          <View style={s.rowBody}>
+            <Text style={s.rowLabel}>Versione app</Text>
+            <Text style={s.rowSub}>1.0.0</Text>
+          </View>
+        </View>
+        <View style={s.separator} />
+        <TouchableOpacity style={s.row} activeOpacity={0.7} onPress={() => showAlert({ title: 'Contatti', message: 'Per supporto scrivi a support@ruggedin.app' })}>
+          <Text style={s.rowIcon}>✉️</Text>
+          <View style={s.rowBody}>
+            <Text style={s.rowLabel}>Contatta il supporto</Text>
+          </View>
+          <Text style={s.rowChevron}>›</Text>
+        </TouchableOpacity>
+        <View style={s.separator} />
+        <TouchableOpacity style={s.row} activeOpacity={0.7} onPress={() => showAlert({ title: 'Privacy Policy', message: 'Consulta la nostra privacy policy su ruggedin.app/privacy' })}>
+          <Text style={s.rowIcon}>🔒</Text>
+          <View style={s.rowBody}>
+            <Text style={s.rowLabel}>Privacy Policy</Text>
+          </View>
+          <Text style={s.rowChevron}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Account */}
+      <Text style={s.groupLabel}>Account</Text>
+      <View style={s.group}>
+        <TouchableOpacity style={s.row} activeOpacity={0.7} onPress={() => showAlert({
+          title: 'Disconnetti',
+          message: 'Sei sicuro di voler uscire?',
+          buttons: [
+            { text: 'Annulla', style: 'cancel' },
+            { text: 'Disconnetti', style: 'destructive', onPress: () => supabase.auth.signOut() },
+          ],
+        })}>
+          <Text style={s.rowIcon}>🚪</Text>
+          <View style={s.rowBody}><Text style={s.rowLabel}>Disconnetti</Text></View>
+        </TouchableOpacity>
+        <View style={s.separator} />
+        <TouchableOpacity style={s.row} activeOpacity={0.7} onPress={handleDeleteAccount}>
+          <Text style={s.rowIcon}>🗑️</Text>
+          <View style={s.rowBody}><Text style={[s.rowLabel, { color: '#ef4444' }]}>Elimina account</Text></View>
+        </TouchableOpacity>
+      </View>
+
+    </ScrollView>
+  );
+}
+
+const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg },
+  content: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 48 },
+  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 32 },
+  backText: { color: c.accent, fontSize: 16 },
+  title: { textAlign: 'center', fontSize: 20, fontWeight: '800', color: c.text },
+  groupLabel: { fontSize: 11, fontWeight: '700', color: c.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, marginLeft: 4 },
+  group: { backgroundColor: c.surface, borderRadius: 14, borderWidth: 1, borderColor: c.border, marginBottom: 28, overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
+  separator: { height: 1, backgroundColor: c.border, marginHorizontal: 16 },
+  rowIcon: { fontSize: 20, width: 28, textAlign: 'center' },
+  rowBody: { flex: 1 },
+  rowLabel: { fontSize: 15, fontWeight: '600', color: c.text },
+  rowSub: { fontSize: 12, color: c.textMuted, marginTop: 2 },
+  rowChevron: { color: c.textMuted, fontSize: 20 },
+  dot: { width: 12, height: 12, borderRadius: 6 },
+});

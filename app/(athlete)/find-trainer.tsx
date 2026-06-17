@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput,
-  TouchableOpacity, ActivityIndicator, Alert,
+  TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../hooks/useProfile';
 import { useTheme } from '@/context/ThemeContext';
+import { useAlert } from '@/context/AlertContext';
+import { InstagramButton } from '@/components/InstagramButton';
 
 type Trainer = {
   id: string;
@@ -15,36 +17,38 @@ type Trainer = {
   bio: string | null;
   avatar_url: string | null;
   athlete_count: number;
+  instagram_handle: string | null;
 };
 
 export default function FindTrainerScreen() {
   const { profile } = useProfile();
   const { colors } = useTheme();
   const router = useRouter();
+  const { showAlert } = useAlert();
   const s = makeStyles(colors);
 
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState<string | null>(null); // trainer id in corso
-  const [sentIds, setSentIds] = useState<Set<string>>(new Set()); // richieste già inviate
+  const [sending, setSending] = useState<string | null>(null);
+  const [sentIds, setSentIds] = useState<Set<string>>(new Set()); // richieste pending
+  const [linkedTrainerId, setLinkedTrainerId] = useState<string | null>(null); // trainer attuale
 
-  // Carica richieste pending esistenti per escluderle visivamente
   const fetchPendingRequests = useCallback(async () => {
     if (!profile) return;
-    const { data } = await supabase
-      .from('trainer_athlete_requests')
-      .select('trainer_id')
-      .eq('athlete_id', profile.id)
-      .eq('status', 'pending');
-    if (data) setSentIds(new Set(data.map((r) => r.trainer_id)));
+    const [pendingRes, linkedRes] = await Promise.all([
+      supabase.from('trainer_athlete_requests').select('trainer_id').eq('athlete_id', profile.id).eq('status', 'pending'),
+      supabase.from('trainer_athlete').select('trainer_id').eq('athlete_id', profile.id).maybeSingle(),
+    ]);
+    if (pendingRes.data) setSentIds(new Set(pendingRes.data.map((r) => r.trainer_id)));
+    if (linkedRes.data?.trainer_id) setLinkedTrainerId(linkedRes.data.trainer_id);
   }, [profile]);
 
   const fetchTrainers = useCallback(async (query: string) => {
     setLoading(true);
     const { data, error } = await supabase.rpc('get_public_trainers', { p_search: query });
     if (error) {
-      Alert.alert('Errore', error.message);
+      showAlert({ title: 'Errore', message: error.message });
     } else {
       setTrainers(data ?? []);
     }
@@ -62,10 +66,10 @@ export default function FindTrainerScreen() {
   }, [search, fetchTrainers]);
 
   const handleSendRequest = (trainer: Trainer) => {
-    Alert.alert(
-      'Invia richiesta',
-      `Vuoi inviare una richiesta di allenamento a ${trainer.full_name}?`,
-      [
+    showAlert({
+      title: 'Invia richiesta',
+      message: `Vuoi inviare una richiesta di allenamento a ${trainer.full_name}?`,
+      buttons: [
         { text: 'Annulla', style: 'cancel' },
         {
           text: 'Invia',
@@ -82,24 +86,26 @@ export default function FindTrainerScreen() {
                 // Richiesta già esistente: aggiorna solo la UI
                 setSentIds((prev) => new Set(prev).add(trainer.id));
               } else {
-                Alert.alert('Errore', error.message);
+                showAlert({ title: 'Errore', message: error.message });
               }
             } else {
               setSentIds((prev) => new Set(prev).add(trainer.id));
-              Alert.alert('Richiesta inviata', `${trainer.full_name} riceverà una notifica.`);
+              showAlert({ title: 'Richiesta inviata', message: `${trainer.full_name} riceverà una notifica.` });
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const renderTrainer = ({ item }: { item: Trainer }) => {
+    const isLinked = linkedTrainerId === item.id;
     const isSent = sentIds.has(item.id);
     const isSending = sending === item.id;
+    const isDisabled = isLinked || isSent || isSending;
 
     return (
-      <View style={s.card}>
+      <TouchableOpacity style={s.card} onPress={() => router.push({ pathname: '/(athlete)/trainer/[id]', params: { id: item.id } })}>
         {item.avatar_url ? (
           <Image source={{ uri: item.avatar_url }} style={s.avatar} contentFit="cover" />
         ) : (
@@ -110,28 +116,26 @@ export default function FindTrainerScreen() {
 
         <View style={s.cardBody}>
           <Text style={s.name}>{item.full_name}</Text>
-          {item.bio ? (
-            <Text style={s.bio} numberOfLines={2}>{item.bio}</Text>
-          ) : null}
-          <Text style={s.count}>
-            {item.athlete_count} {item.athlete_count === 1 ? 'atleta' : 'atleti'}
-          </Text>
+          {item.bio ? <Text style={s.bio} numberOfLines={2}>{item.bio}</Text> : null}
+          <Text style={s.count}>{item.athlete_count} {item.athlete_count === 1 ? 'atleta' : 'atleti'}</Text>
         </View>
 
-        <TouchableOpacity
-          style={[s.requestBtn, isSent && s.requestBtnSent]}
-          onPress={() => !isSent && handleSendRequest(item)}
-          disabled={isSent || isSending}
-        >
-          {isSending ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={[s.requestBtnText, isSent && s.requestBtnTextSent]}>
-              {isSent ? '✓ Inviata' : 'Richiedi'}
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
+        <View style={s.cardActions}>
+          <TouchableOpacity
+            style={[s.requestBtn, isDisabled && s.requestBtnSent, isLinked && s.requestBtnLinked]}
+            onPress={() => !isDisabled && handleSendRequest(item)}
+            disabled={isDisabled}
+          >
+            {isSending ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={[s.requestBtnText, isDisabled && s.requestBtnTextSent, isLinked && s.requestBtnTextLinked]}>
+                {isLinked ? '✓ Associato' : isSent ? '✓ Inviata' : 'Richiedi'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -141,7 +145,7 @@ export default function FindTrainerScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={s.backText}>‹ Indietro</Text>
         </TouchableOpacity>
-        <Text style={s.title}>Trova un Trainer</Text>
+        <View style={s.titleWrap} pointerEvents="none"><Text style={s.title}>Trova un Trainer</Text></View>
       </View>
 
       <View style={s.searchBar}>
@@ -184,9 +188,10 @@ export default function FindTrainerScreen() {
 
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 24, paddingTop: 60, paddingBottom: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingTop: 60, paddingBottom: 16 },
   backText: { color: c.accent, fontSize: 16 },
-  title: { fontSize: 20, fontWeight: '800', color: c.text },
+  titleWrap: { position: 'absolute', left: 0, right: 0 },
+  title: { textAlign: 'center', fontSize: 20, fontWeight: '800', color: c.text },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface, borderRadius: 12, marginHorizontal: 24, marginBottom: 16, paddingHorizontal: 14, borderWidth: 1, borderColor: c.border },
   searchIcon: { fontSize: 16, marginRight: 8 },
   searchInput: { flex: 1, color: c.text, fontSize: 15, paddingVertical: 14 },
@@ -202,8 +207,11 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   name: { color: c.text, fontSize: 15, fontWeight: '700' },
   bio: { color: c.textSecondary, fontSize: 12, marginTop: 2 },
   count: { color: c.textMuted, fontSize: 11, marginTop: 4 },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   requestBtn: { backgroundColor: c.accent, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, minWidth: 80, alignItems: 'center' },
   requestBtnSent: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
+  requestBtnLinked: { backgroundColor: c.surface, borderWidth: 1, borderColor: '#4CAF50' },
   requestBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   requestBtnTextSent: { color: c.textMuted },
+  requestBtnTextLinked: { color: '#4CAF50' },
 });

@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, ActivityIndicator, Alert, Platform
+  TouchableOpacity, ActivityIndicator, Platform
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../hooks/useProfile';
 import { useTheme } from '@/context/ThemeContext';
+import { useAlert } from '@/context/AlertContext';
 
 type Exercise = {
   id: string;
@@ -28,10 +29,11 @@ type SetLog = { set_type: 'normal' | 'dropset' | 'backoff'; reps_done: string; w
 type ExerciseLog = { exercise: Exercise; sets: SetLog[] };
 
 export default function SessionScreen() {
-  const { planId } = useLocalSearchParams<{ planId: string }>();
+  const { planId, dayIndex } = useLocalSearchParams<{ planId: string; dayIndex: string }>();
   const { profile } = useProfile();
   const { colors } = useTheme();
   const router = useRouter();
+  const { showAlert } = useAlert();
 
   const [logs, setLogs] = useState<ExerciseLog[]>([]);
   const [planName, setPlanName] = useState('');
@@ -45,17 +47,26 @@ export default function SessionScreen() {
   useEffect(() => { fetchPlan(); }, [planId]);
 
   const fetchPlan = async () => {
-    const { data } = await supabase
+    const { data: planData } = await supabase
       .from('workout_plans')
-      .select('name, exercises (id, name, muscle_group, sets, reps, rest_seconds, notes, order_index, has_dropset, dropset_percentage, has_backoff, backoff_percentage)')
+      .select('name')
       .eq('id', planId)
       .single();
 
-    if (data) {
-      setPlanName(data.name);
-      const sorted = (data.exercises as Exercise[]).sort((a, b) => a.order_index - b.order_index);
-      setLogs(sorted.map(e => buildInitialLog(e)));
-    }
+    if (planData) setPlanName(planData.name);
+
+    let query = supabase
+      .from('exercises')
+      .select('id, name, muscle_group, sets, reps, rest_seconds, notes, order_index, has_dropset, dropset_percentage, has_backoff, backoff_percentage')
+      .eq('workout_plan_id', planId)
+      .eq('is_deleted', false)
+      .order('order_index');
+
+    if (dayIndex) query = query.eq('day_index', parseInt(dayIndex));
+
+    const { data: exData } = await query;
+    if (exData) setLogs((exData as Exercise[]).map(e => buildInitialLog(e)));
+
     setLoading(false);
   };
 
@@ -85,7 +96,7 @@ export default function SessionScreen() {
   const handleSave = async () => {
     const hasAnyWeight = logs.some(l => l.sets.some(s => s.weight_used_kg.trim() !== ''));
     if (!hasAnyWeight) {
-      Alert.alert('Errore', 'Inserisci almeno un peso per salvare la sessione.');
+      showAlert({ title: 'Errore', message: 'Inserisci almeno un peso per salvare la sessione.' });
       return;
     }
     setSaving(true);
@@ -103,15 +114,20 @@ export default function SessionScreen() {
           reps_done: parseInt(set.reps_done) || log.exercise.reps,
           weight_used_kg: parseFloat(set.weight_used_kg),
           set_type: set.set_type,
+          day_index: dayIndex ? parseInt(dayIndex) : 1,
         });
       });
     });
     const { error } = await supabase.from('workout_logs').insert(rows);
-    if (error) { Alert.alert('Errore', error.message); setSaving(false); return; }
+    if (error) { showAlert({ title: 'Errore', message: error.message }); setSaving(false); return; }
     setSaving(false);
-    Alert.alert('Sessione salvata!', `Ottimo lavoro 💪\n${formatDate(sessionDate)}`, [
-      { text: 'OK', onPress: () => router.replace('/(athlete)/plans') }
-    ]);
+    showAlert({
+      title: 'Sessione salvata!',
+      message: `Ottimo lavoro 💪\n${formatDate(sessionDate)}`,
+      buttons: [
+        { text: 'OK', onPress: () => router.replace('/(athlete)/plans') },
+      ],
+    });
   };
 
   if (loading) {
@@ -123,14 +139,18 @@ export default function SessionScreen() {
 
       <View style={s.header}>
         <TouchableOpacity onPress={() => {
-          Alert.alert('Abbandona sessione', 'Sei sicuro? I dati non salvati andranno persi.', [
-            { text: 'Continua', style: 'cancel' },
-            { text: 'Abbandona', style: 'destructive', onPress: () => router.replace('/(athlete)/plans') },
-          ]);
+          showAlert({
+            title: 'Abbandona sessione',
+            message: 'Sei sicuro? I dati non salvati andranno persi.',
+            buttons: [
+              { text: 'Continua', style: 'cancel' },
+              { text: 'Abbandona', style: 'destructive', onPress: () => router.replace('/(athlete)/plans') },
+            ],
+          });
         }}>
           <Text style={s.backText}>✕ Abbandona</Text>
         </TouchableOpacity>
-        <Text style={s.sessionTitle}>{planName}</Text>
+        <Text style={s.sessionTitle}>{planName}{dayIndex ? ` — Giorno ${dayIndex}` : ''}</Text>
       </View>
 
       <TouchableOpacity style={s.dateSelector} onPress={() => setShowDatePicker(true)}>

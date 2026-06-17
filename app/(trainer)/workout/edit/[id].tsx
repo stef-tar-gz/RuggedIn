@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, ActivityIndicator, Alert, Switch
+  TouchableOpacity, ActivityIndicator, Switch, Animated
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { useProfile } from '../../../../hooks/useProfile';
 import { useTheme } from '@/context/ThemeContext';
+import { useAlert } from '@/context/AlertContext';
 import ExercisePickerModal, { CatalogExercise } from '../../../../components/ExercisePickerModal';
 
 type Exercise = {
@@ -16,6 +17,7 @@ type Exercise = {
   sets: string; reps: string; rest_seconds: string; notes: string; order_index: number;
   has_dropset: boolean; dropset_percentage: string;
   has_backoff: boolean; backoff_percentage: string;
+  day_index: number;
 };
 
 export default function EditWorkoutScreen() {
@@ -23,6 +25,7 @@ export default function EditWorkoutScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const { profile } = useProfile();
+  const { showAlert } = useAlert();
 
   const [planName, setPlanName] = useState('');
   const [description, setDescription] = useState('');
@@ -36,7 +39,23 @@ export default function EditWorkoutScreen() {
 
   const s = makeStyles(colors);
 
+  const backTitleAnim = useRef(new Animated.Value(0)).current;
+  const infoAnim = useRef(new Animated.Value(0)).current;
+  const exercisesAnim = useRef(new Animated.Value(0)).current;
+  const saveAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => { fetchPlan(); }, [id]);
+
+  useEffect(() => {
+    if (!loading) {
+      Animated.stagger(120, [
+        Animated.timing(backTitleAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(infoAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(exercisesAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(saveAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [loading]);
 
   const fetchPlan = async () => {
     const [{ data: plan }, { data: exData }] = await Promise.all([
@@ -53,6 +72,7 @@ export default function EditWorkoutScreen() {
         rest_seconds: String(e.rest_seconds), notes: e.notes ?? '', order_index: e.order_index,
         has_dropset: e.has_dropset ?? false, dropset_percentage: e.dropset_percentage != null ? String(e.dropset_percentage) : '20',
         has_backoff: e.has_backoff ?? false, backoff_percentage: e.backoff_percentage != null ? String(e.backoff_percentage) : '15',
+        day_index: e.day_index ?? 1,
       })));
     }
     setLoading(false);
@@ -61,11 +81,59 @@ export default function EditWorkoutScreen() {
   const updateExercise = (index: number, field: keyof Exercise, value: any) => {
     setExercises(prev => { const u = [...prev]; u[index] = { ...u[index], [field]: value }; return u; });
   };
-  const addExercise = () => {
-    setExercises(prev => [...prev, { catalog_exercise_id: null, name: '', muscle_group: '', sets: '3', reps: '10', rest_seconds: '90', notes: '', order_index: prev.length, has_dropset: false, dropset_percentage: '20', has_backoff: false, backoff_percentage: '15' }]);
+
+  const addExercise = (dayIndex: number) => {
+    setExercises(prev => [...prev, {
+      catalog_exercise_id: null, name: '', muscle_group: '',
+      sets: '3', reps: '10', rest_seconds: '90', notes: '', order_index: prev.length,
+      has_dropset: false, dropset_percentage: '20',
+      has_backoff: false, backoff_percentage: '15',
+      day_index: dayIndex,
+    }]);
   };
+
+  const addDay = () => {
+    setExercises(prev => {
+      const maxDay = prev.reduce((max, e) => Math.max(max, e.day_index), 0);
+      const newDay = maxDay + 1;
+      return [...prev, {
+        catalog_exercise_id: null, name: '', muscle_group: '',
+        sets: '3', reps: '10', rest_seconds: '90', notes: '', order_index: prev.length,
+        has_dropset: false, dropset_percentage: '20',
+        has_backoff: false, backoff_percentage: '15',
+        day_index: newDay,
+      }];
+    });
+  };
+
+  const removeDay = (dayIndex: number) => {
+    const dayExercises = exercises.filter(e => e.day_index === dayIndex && e.name.trim());
+    const doRemove = () => setExercises(prev => prev.filter(e => e.day_index !== dayIndex));
+
+    if (dayExercises.length > 0) {
+      showAlert({
+        title: 'Elimina giorno',
+        message: `Sei sicuro di voler eliminare il Giorno ${dayIndex} e tutti i suoi esercizi?`,
+        buttons: [
+          { text: 'Annulla', style: 'cancel' },
+          { text: 'Elimina', style: 'destructive', onPress: doRemove },
+        ],
+      });
+    } else {
+      doRemove();
+    }
+  };
+
   const removeExercise = (index: number) => {
-    if (exercises.length > 1) setExercises(prev => prev.filter((_, i) => i !== index));
+    setExercises(prev => {
+      const day = prev[index].day_index;
+      const dayCount = prev.filter(e => e.day_index === day).length;
+      // Don't remove if it's the only exercise in the only day
+      if (prev.length === 1) return prev;
+      const next = prev.filter((_, i) => i !== index);
+      // If removed the last exercise of this day, clean up (day is now gone automatically)
+      return next;
+    });
   };
 
   const openPicker = (index: number) => { setPickerTargetIndex(index); setPickerVisible(true); };
@@ -82,14 +150,14 @@ export default function EditWorkoutScreen() {
   };
 
   const handleSave = async () => {
-    if (!planName.trim()) { Alert.alert('Errore', 'Inserisci un nome per la scheda.'); return; }
-    if (exercises.some(e => !e.name.trim())) { Alert.alert('Errore', 'Ogni esercizio deve essere selezionato dal catalogo.'); return; }
+    if (!planName.trim()) { showAlert({ title: 'Errore', message: 'Inserisci un nome per la scheda.' }); return; }
+    if (exercises.some(e => !e.name.trim())) { showAlert({ title: 'Errore', message: 'Ogni esercizio deve essere selezionato dal catalogo.' }); return; }
 
     setSaving(true);
     const { error: planError } = await supabase.from('workout_plans')
       .update({ name: planName.trim(), description: description.trim() || null, is_active: isActive })
       .eq('id', id);
-    if (planError) { Alert.alert('Errore', planError.message); setSaving(false); return; }
+    if (planError) { showAlert({ title: 'Errore', message: planError.message }); setSaving(false); return; }
 
     const { data: originalExercises } = await supabase.from('exercises').select('id').eq('workout_plan_id', id).eq('is_deleted', false);
     const originalIds = (originalExercises || []).map(e => e.id);
@@ -105,13 +173,29 @@ export default function EditWorkoutScreen() {
         notes: e.notes.trim() || null, order_index: index,
         has_dropset: e.has_dropset, dropset_percentage: e.has_dropset ? parseFloat(e.dropset_percentage) || null : null,
         has_backoff: e.has_backoff, backoff_percentage: e.has_backoff ? parseFloat(e.backoff_percentage) || null : null,
+        day_index: e.day_index,
       };
       if (e.id) await supabase.from('exercises').update(payload).eq('id', e.id);
       else await supabase.from('exercises').insert({ workout_plan_id: id, ...payload });
     }
 
     setSaving(false);
-    Alert.alert('Salvato', 'Scheda aggiornata!', [{ text: 'OK', onPress: () => router.back() }]);
+    showAlert({ title: 'Salvato', message: 'Scheda aggiornata!', buttons: [{ text: 'OK', onPress: () => router.back() }] });
+  };
+
+  // Helper: unique sorted day indices
+  const days = [...new Set(exercises.map(e => e.day_index))].sort((a, b) => a - b);
+
+  // Helper: flat index of the n-th exercise within a given day
+  const flatIndex = (day: number, localIdx: number): number => {
+    let count = 0;
+    for (let i = 0; i < exercises.length; i++) {
+      if (exercises[i].day_index === day) {
+        if (count === localIdx) return i;
+        count++;
+      }
+    }
+    return -1;
   };
 
   if (loading) {
@@ -121,100 +205,134 @@ export default function EditWorkoutScreen() {
   return (
     <>
       <ScrollView style={s.container} contentContainerStyle={s.content}>
-        <TouchableOpacity style={s.backButton} onPress={() => router.back()}>
-          <Text style={s.backText}>‹ Scheda</Text>
-        </TouchableOpacity>
-
-        <Text style={s.title}>Modifica scheda</Text>
-
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Info scheda</Text>
-          <TextInput style={s.input} placeholder="Nome scheda" placeholderTextColor={colors.textMuted} value={planName} onChangeText={setPlanName} />
-          <TextInput style={[s.input, s.inputMultiline]} placeholder="Descrizione (opzionale)" placeholderTextColor={colors.textMuted} value={description} onChangeText={setDescription} multiline numberOfLines={3} />
-          <TouchableOpacity
-            style={[s.toggleRow, { borderColor: isActive ? '#4CAF50' : colors.border }]}
-            onPress={() => setIsActive(prev => !prev)}
-          >
-            <View>
-              <Text style={s.toggleLabel}>Scheda attiva</Text>
-              <Text style={s.toggleSub}>{isActive ? 'Visibile all\'atleta' : 'Nascosta all\'atleta'}</Text>
-            </View>
-            <View style={[s.toggleDot, { backgroundColor: isActive ? '#4CAF50' : colors.textMuted }]} />
+        <Animated.View style={{ opacity: backTitleAnim, transform: [{ translateY: backTitleAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
+          <TouchableOpacity style={s.backButton} onPress={() => router.back()}>
+            <Text style={s.backText}>‹ Scheda</Text>
           </TouchableOpacity>
-        </View>
+          <Text style={s.title}>Modifica scheda</Text>
+        </Animated.View>
 
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Esercizi</Text>
+        <Animated.View style={{ opacity: infoAnim, transform: [{ translateY: infoAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Info scheda</Text>
+            <TextInput style={s.input} placeholder="Nome scheda" placeholderTextColor={colors.textMuted} value={planName} onChangeText={setPlanName} />
+            <TextInput style={[s.input, s.inputMultiline]} placeholder="Descrizione (opzionale)" placeholderTextColor={colors.textMuted} value={description} onChangeText={setDescription} multiline numberOfLines={3} />
+            <TouchableOpacity
+              style={[s.toggleRow, { borderColor: isActive ? '#4CAF50' : colors.border }]}
+              onPress={() => setIsActive(prev => !prev)}
+            >
+              <View>
+                <Text style={s.toggleLabel}>Scheda attiva</Text>
+                <Text style={s.toggleSub}>{isActive ? 'Visibile all\'atleta' : 'Nascosta all\'atleta'}</Text>
+              </View>
+              <View style={[s.toggleDot, { backgroundColor: isActive ? '#4CAF50' : colors.textMuted }]} />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
 
-          {exercises.map((exercise, index) => (
-            <View key={index} style={s.exerciseCard}>
-              <View style={s.exerciseHeader}>
-                <Text style={s.exerciseNumber}>Esercizio {index + 1}</Text>
-                {exercises.length > 1 && (
-                  <TouchableOpacity onPress={() => removeExercise(index)}>
-                    <Text style={s.removeText}>Rimuovi</Text>
+        <Animated.View style={{ opacity: exercisesAnim, transform: [{ translateY: exercisesAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Esercizi</Text>
+
+            {days.map(day => {
+              const dayExercises = exercises
+                .map((e, i) => ({ exercise: e, globalIndex: i }))
+                .filter(({ exercise }) => exercise.day_index === day);
+
+              return (
+                <View key={day}>
+                  {/* Day header */}
+                  <View style={s.dayHeader}>
+                    <Text style={s.dayHeaderText}>Giorno {day}</Text>
+                    {days.length > 1 && (
+                      <TouchableOpacity onPress={() => removeDay(day)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Text style={s.dayDeleteBtn}>🗑️</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Exercises for this day */}
+                  {dayExercises.map(({ exercise, globalIndex }, localIdx) => (
+                    <View key={globalIndex} style={s.exerciseCard}>
+                      <View style={s.exerciseHeader}>
+                        <Text style={s.exerciseNumber}>Esercizio {localIdx + 1}</Text>
+                        {exercises.length > 1 && (
+                          <TouchableOpacity onPress={() => removeExercise(globalIndex)}>
+                            <Text style={s.removeText}>Rimuovi</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      <TouchableOpacity style={[s.pickerBtn, exercise.name ? s.pickerBtnFilled : null]} onPress={() => openPicker(globalIndex)}>
+                        {exercise.name ? (
+                          <View style={{ flex: 1 }}>
+                            <Text style={s.pickerBtnName}>{exercise.name}</Text>
+                            <Text style={s.pickerBtnMuscle}>{exercise.muscle_group}</Text>
+                          </View>
+                        ) : (
+                          <Text style={s.pickerBtnPlaceholder}>Tocca per scegliere un esercizio...</Text>
+                        )}
+                        <Text style={s.pickerBtnIcon}>📋</Text>
+                      </TouchableOpacity>
+
+                      <View style={s.row}>
+                        <View style={s.rowItem}><Text style={s.rowLabel}>Serie</Text><TextInput style={s.inputSmall} value={exercise.sets} onChangeText={(v) => updateExercise(globalIndex, 'sets', v)} keyboardType="numeric" /></View>
+                        <View style={s.rowItem}><Text style={s.rowLabel}>Reps</Text><TextInput style={s.inputSmall} value={exercise.reps} onChangeText={(v) => updateExercise(globalIndex, 'reps', v)} keyboardType="numeric" /></View>
+                        <View style={s.rowItem}><Text style={s.rowLabel}>Riposo (s)</Text><TextInput style={s.inputSmall} value={exercise.rest_seconds} onChangeText={(v) => updateExercise(globalIndex, 'rest_seconds', v)} keyboardType="numeric" /></View>
+                      </View>
+
+                      <View style={s.toggleRow}>
+                        <View><Text style={s.toggleLabel}>Dropset</Text><Text style={s.toggleSub}>Riduzione peso a cedimento</Text></View>
+                        <Switch value={exercise.has_dropset} onValueChange={(v) => updateExercise(globalIndex, 'has_dropset', v)} trackColor={{ false: colors.border, true: '#E8533A55' }} thumbColor={exercise.has_dropset ? colors.accent : colors.textMuted} />
+                      </View>
+                      {exercise.has_dropset && (
+                        <View style={s.percentageRow}>
+                          <Text style={s.percentageLabel}>Riduzione peso dropset</Text>
+                          <View style={s.percentageInput}>
+                            <TextInput style={s.inputSmall} value={exercise.dropset_percentage} onChangeText={(v) => updateExercise(globalIndex, 'dropset_percentage', v)} keyboardType="decimal-pad" />
+                            <Text style={s.percentageSign}>%</Text>
+                          </View>
+                        </View>
+                      )}
+
+                      <View style={s.toggleRow}>
+                        <View><Text style={s.toggleLabel}>Backoff</Text><Text style={s.toggleSub}>Serie finale a volume ridotto</Text></View>
+                        <Switch value={exercise.has_backoff} onValueChange={(v) => updateExercise(globalIndex, 'has_backoff', v)} trackColor={{ false: colors.border, true: '#E8533A55' }} thumbColor={exercise.has_backoff ? colors.accent : colors.textMuted} />
+                      </View>
+                      {exercise.has_backoff && (
+                        <View style={s.percentageRow}>
+                          <Text style={s.percentageLabel}>Riduzione peso backoff</Text>
+                          <View style={s.percentageInput}>
+                            <TextInput style={s.inputSmall} value={exercise.backoff_percentage} onChangeText={(v) => updateExercise(globalIndex, 'backoff_percentage', v)} keyboardType="decimal-pad" />
+                            <Text style={s.percentageSign}>%</Text>
+                          </View>
+                        </View>
+                      )}
+
+                      <TextInput style={s.input} placeholder="Note (opzionale)" placeholderTextColor={colors.textMuted} value={exercise.notes} onChangeText={(v) => updateExercise(globalIndex, 'notes', v)} />
+                    </View>
+                  ))}
+
+                  {/* Per-day add exercise button */}
+                  <TouchableOpacity style={[s.addExerciseButton, s.addExerciseDayButton]} onPress={() => addExercise(day)}>
+                    <Text style={s.addExerciseText}>+ Aggiungi esercizio</Text>
                   </TouchableOpacity>
-                )}
-              </View>
-
-              <TouchableOpacity style={[s.pickerBtn, exercise.name ? s.pickerBtnFilled : null]} onPress={() => openPicker(index)}>
-                {exercise.name ? (
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.pickerBtnName}>{exercise.name}</Text>
-                    <Text style={s.pickerBtnMuscle}>{exercise.muscle_group}</Text>
-                  </View>
-                ) : (
-                  <Text style={s.pickerBtnPlaceholder}>Tocca per scegliere un esercizio...</Text>
-                )}
-                <Text style={s.pickerBtnIcon}>📋</Text>
-              </TouchableOpacity>
-
-              <View style={s.row}>
-                <View style={s.rowItem}><Text style={s.rowLabel}>Serie</Text><TextInput style={s.inputSmall} value={exercise.sets} onChangeText={(v) => updateExercise(index, 'sets', v)} keyboardType="numeric" /></View>
-                <View style={s.rowItem}><Text style={s.rowLabel}>Reps</Text><TextInput style={s.inputSmall} value={exercise.reps} onChangeText={(v) => updateExercise(index, 'reps', v)} keyboardType="numeric" /></View>
-                <View style={s.rowItem}><Text style={s.rowLabel}>Riposo (s)</Text><TextInput style={s.inputSmall} value={exercise.rest_seconds} onChangeText={(v) => updateExercise(index, 'rest_seconds', v)} keyboardType="numeric" /></View>
-              </View>
-
-              <View style={s.toggleRow}>
-                <View><Text style={s.toggleLabel}>Dropset</Text><Text style={s.toggleSub}>Riduzione peso a cedimento</Text></View>
-                <Switch value={exercise.has_dropset} onValueChange={(v) => updateExercise(index, 'has_dropset', v)} trackColor={{ false: colors.border, true: '#E8533A55' }} thumbColor={exercise.has_dropset ? colors.accent : colors.textMuted} />
-              </View>
-              {exercise.has_dropset && (
-                <View style={s.percentageRow}>
-                  <Text style={s.percentageLabel}>Riduzione peso dropset</Text>
-                  <View style={s.percentageInput}>
-                    <TextInput style={s.inputSmall} value={exercise.dropset_percentage} onChangeText={(v) => updateExercise(index, 'dropset_percentage', v)} keyboardType="decimal-pad" />
-                    <Text style={s.percentageSign}>%</Text>
-                  </View>
                 </View>
-              )}
+              );
+            })}
 
-              <View style={s.toggleRow}>
-                <View><Text style={s.toggleLabel}>Backoff</Text><Text style={s.toggleSub}>Serie finale a volume ridotto</Text></View>
-                <Switch value={exercise.has_backoff} onValueChange={(v) => updateExercise(index, 'has_backoff', v)} trackColor={{ false: colors.border, true: '#E8533A55' }} thumbColor={exercise.has_backoff ? colors.accent : colors.textMuted} />
-              </View>
-              {exercise.has_backoff && (
-                <View style={s.percentageRow}>
-                  <Text style={s.percentageLabel}>Riduzione peso backoff</Text>
-                  <View style={s.percentageInput}>
-                    <TextInput style={s.inputSmall} value={exercise.backoff_percentage} onChangeText={(v) => updateExercise(index, 'backoff_percentage', v)} keyboardType="decimal-pad" />
-                    <Text style={s.percentageSign}>%</Text>
-                  </View>
-                </View>
-              )}
+            {/* Add day button */}
+            <TouchableOpacity style={[s.addExerciseButton, s.addDayButton]} onPress={addDay}>
+              <Text style={s.addDayText}>+ Aggiungi giorno</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
 
-              <TextInput style={s.input} placeholder="Note (opzionale)" placeholderTextColor={colors.textMuted} value={exercise.notes} onChangeText={(v) => updateExercise(index, 'notes', v)} />
-            </View>
-          ))}
-
-          <TouchableOpacity style={s.addExerciseButton} onPress={addExercise}>
-            <Text style={s.addExerciseText}>+ Aggiungi esercizio</Text>
+        <Animated.View style={{ opacity: saveAnim, transform: [{ translateY: saveAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
+          <TouchableOpacity style={s.saveButton} onPress={handleSave} disabled={saving}>
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveButtonText}>Salva modifiche</Text>}
           </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={s.saveButton} onPress={handleSave} disabled={saving}>
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveButtonText}>Salva modifiche</Text>}
-        </TouchableOpacity>
+        </Animated.View>
       </ScrollView>
 
       {profile && (
@@ -235,7 +353,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   centered: { flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' },
   backButton: { marginBottom: 24 },
   backText: { color: c.accent, fontSize: 16 },
-  title: { fontSize: 28, fontWeight: '800', color: c.text, marginBottom: 32 },
+  title: { fontSize: 28, fontWeight: '800', color: c.text, marginBottom: 32, textAlign: 'center' },
   section: { marginBottom: 32 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: c.textSecondary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },
   input: { backgroundColor: c.surface, borderRadius: 10, padding: 14, color: c.text, fontSize: 15, marginBottom: 10, borderWidth: 1, borderColor: c.border },
@@ -264,6 +382,12 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   inputSmall: { backgroundColor: c.surface, borderRadius: 8, padding: 10, color: c.text, fontSize: 15, borderWidth: 1, borderColor: c.border, textAlign: 'center' },
   addExerciseButton: { borderWidth: 1, borderColor: c.accent, borderRadius: 10, borderStyle: 'dashed', padding: 16, alignItems: 'center' },
   addExerciseText: { color: c.accent, fontSize: 15, fontWeight: '600' },
+  addExerciseDayButton: { marginBottom: 24 },
+  addDayButton: { borderColor: c.textSecondary, marginTop: 4 },
+  addDayText: { color: c.textSecondary, fontSize: 15, fontWeight: '600' },
+  dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, marginTop: 4 },
+  dayHeaderText: { color: c.accent, fontSize: 15, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  dayDeleteBtn: { fontSize: 18 },
   saveButton: { backgroundColor: c.accent, borderRadius: 12, padding: 18, alignItems: 'center' },
   saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 });

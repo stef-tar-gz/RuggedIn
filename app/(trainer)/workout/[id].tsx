@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  ActivityIndicator, TouchableOpacity, Alert
+  ActivityIndicator, TouchableOpacity, Animated
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
+import { useAlert } from '@/context/AlertContext';
 import ExerciseInfoModal, { ExerciseInfo } from '../../../components/ExerciseInfoModal';
 
 type WorkoutPlan = { id: string; name: string; description: string | null; is_active: boolean; created_at: string };
@@ -21,6 +22,7 @@ export default function WorkoutPlanScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors } = useTheme();
+  const { showAlert } = useAlert();
 
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -29,7 +31,21 @@ export default function WorkoutPlanScreen() {
 
   const s = makeStyles(colors);
 
+  const topRowAnim = useRef(new Animated.Value(0)).current;
+  const infoAnim = useRef(new Animated.Value(0)).current;
+  const exercisesAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => { fetchPlan(); }, [id]);
+
+  useEffect(() => {
+    if (!loading) {
+      Animated.stagger(120, [
+        Animated.timing(topRowAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(infoAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(exercisesAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [loading]);
 
   const fetchPlan = async () => {
     const [{ data: planData }, { data: exData }] = await Promise.all([
@@ -60,7 +76,7 @@ export default function WorkoutPlanScreen() {
   const toggleActive = async () => {
     if (!plan) return;
     const { error } = await supabase.from('workout_plans').update({ is_active: !plan.is_active }).eq('id', id);
-    if (error) Alert.alert('Errore', error.message);
+    if (error) showAlert({ title: 'Errore', message: error.message });
     else setPlan(prev => prev ? { ...prev, is_active: !prev.is_active } : null);
   };
 
@@ -72,47 +88,52 @@ export default function WorkoutPlanScreen() {
     <>
     <ScrollView style={s.container} contentContainerStyle={s.content}>
 
-      <View style={s.topRow}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>‹ Profilo atleta</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.editButton} onPress={() => router.push({ pathname: '/(trainer)/workout/edit/[id]', params: { id } })}>
-          <Text style={s.editButtonText}>Modifica</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={s.planHeader}>
-        <View style={s.planTitleRow}>
-          <Text style={s.planName}>{plan?.name}</Text>
-          <TouchableOpacity
-            style={[s.statusBadge, { backgroundColor: plan?.is_active ? colors.successBg : colors.border }]}
-            onPress={toggleActive}
-          >
-            <View style={[s.statusDot, { backgroundColor: plan?.is_active ? '#4CAF50' : colors.textMuted }]} />
-            <Text style={[s.statusText, { color: plan?.is_active ? '#4CAF50' : colors.textSecondary }]}>
-              {plan?.is_active ? 'Attiva' : 'Inattiva'}
-            </Text>
+      <Animated.View style={{ opacity: topRowAnim, transform: [{ translateY: topRowAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
+        <View style={s.topRow}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={s.backText}>‹ Profilo atleta</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.editButton} onPress={() => router.push({ pathname: '/(trainer)/workout/edit/[id]', params: { id } })}>
+            <Text style={s.editButtonText}>Modifica</Text>
           </TouchableOpacity>
         </View>
-        {plan?.description && <Text style={s.planDescription}>{plan.description}</Text>}
-        <Text style={s.planDate}>📅 Creata il {new Date(plan?.created_at ?? '').toLocaleDateString('it-IT')}</Text>
-      </View>
+      </Animated.View>
 
-      <View style={s.statsRow}>
-        <View style={s.statBox}>
-          <Text style={s.statValue}>{exercises.length}</Text>
-          <Text style={s.statLabel}>Esercizi</Text>
+      <Animated.View style={{ opacity: infoAnim, transform: [{ translateY: infoAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
+        <View style={s.planHeader}>
+          <View style={s.planTitleRow}>
+            <Text style={s.planName}>{plan?.name}</Text>
+            <TouchableOpacity
+              style={[s.statusBadge, { backgroundColor: plan?.is_active ? colors.successBg : colors.border }]}
+              onPress={toggleActive}
+            >
+              <View style={[s.statusDot, { backgroundColor: plan?.is_active ? '#4CAF50' : colors.textMuted }]} />
+              <Text style={[s.statusText, { color: plan?.is_active ? '#4CAF50' : colors.textSecondary }]}>
+                {plan?.is_active ? 'Attiva' : 'Inattiva'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {plan?.description && <Text style={s.planDescription}>{plan.description}</Text>}
+          <Text style={s.planDate}>📅 Creata il {new Date(plan?.created_at ?? '').toLocaleDateString('it-IT')}</Text>
         </View>
-        <View style={s.statBox}>
-          <Text style={s.statValue}>{exercises.reduce((sum, e) => sum + e.sets, 0)}</Text>
-          <Text style={s.statLabel}>Serie totali</Text>
-        </View>
-        <View style={s.statBox}>
-          <Text style={s.statValue}>{Math.round(exercises.reduce((sum, e) => sum + e.rest_seconds * e.sets, 0) / 60)}m</Text>
-          <Text style={s.statLabel}>Riposo est.</Text>
-        </View>
-      </View>
 
+        <View style={s.statsRow}>
+          <View style={s.statBox}>
+            <Text style={s.statValue}>{exercises.length}</Text>
+            <Text style={s.statLabel}>Esercizi</Text>
+          </View>
+          <View style={s.statBox}>
+            <Text style={s.statValue}>{exercises.reduce((sum, e) => sum + e.sets, 0)}</Text>
+            <Text style={s.statLabel}>Serie totali</Text>
+          </View>
+          <View style={s.statBox}>
+            <Text style={s.statValue}>{Math.round(exercises.reduce((sum, e) => sum + e.rest_seconds * e.sets, 0) / 60)}m</Text>
+            <Text style={s.statLabel}>Riposo est.</Text>
+          </View>
+        </View>
+      </Animated.View>
+
+      <Animated.View style={{ opacity: exercisesAnim, transform: [{ translateY: exercisesAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
       <Text style={s.sectionTitle}>Esercizi</Text>
       {exercises.map((exercise, index) => (
         <View key={exercise.id} style={s.exerciseCard}>
@@ -150,6 +171,7 @@ export default function WorkoutPlanScreen() {
           </View>
         </View>
       ))}
+      </Animated.View>
     </ScrollView>
 
     <ExerciseInfoModal

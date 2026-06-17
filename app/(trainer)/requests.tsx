@@ -1,13 +1,14 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
-  TouchableOpacity, ActivityIndicator, Alert,
+  TouchableOpacity, ActivityIndicator, Animated,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../hooks/useProfile';
 import { useTheme } from '@/context/ThemeContext';
+import { useAlert } from '@/context/AlertContext';
 
 type PendingRequest = {
   id: string;
@@ -22,15 +23,30 @@ export default function RequestsScreen() {
   const { profile } = useProfile();
   const { colors } = useTheme();
   const router = useRouter();
+  const { showAlert } = useAlert();
   const s = makeStyles(colors);
 
   const [requests, setRequests] = useState<PendingRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const fetchRequests = useCallback(async () => {
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  const listAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!loading) {
+      Animated.stagger(120, [
+        Animated.timing(headerAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(listAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [loading]);
+
+  const fetchRequests = useCallback(async (isRefresh = false) => {
     if (!profile) return;
-    setLoading(true);
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
 
     // Step 1: richieste pending
     const { data: reqData, error } = await supabase
@@ -41,14 +57,16 @@ export default function RequestsScreen() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      Alert.alert('Errore', error.message);
+      showAlert({ title: 'Errore', message: error.message });
       setLoading(false);
+      setRefreshing(false);
       return;
     }
 
     if (!reqData || reqData.length === 0) {
       setRequests([]);
       setLoading(false);
+      setRefreshing(false);
       return;
     }
 
@@ -72,15 +90,16 @@ export default function RequestsScreen() {
       }))
     );
     setLoading(false);
+    setRefreshing(false);
   }, [profile]);
 
   useFocusEffect(useCallback(() => { fetchRequests(); }, [fetchRequests]));
 
   const handleAccept = (req: PendingRequest) => {
-    Alert.alert(
-      'Accetta richiesta',
-      `Vuoi accettare ${req.full_name} come tuo atleta?`,
-      [
+    showAlert({
+      title: 'Accetta richiesta',
+      message: `Vuoi accettare ${req.full_name} come tuo atleta?`,
+      buttons: [
         { text: 'Annulla', style: 'cancel' },
         {
           text: 'Accetta',
@@ -89,22 +108,22 @@ export default function RequestsScreen() {
             const { error } = await supabase.rpc('accept_trainer_request', { p_request_id: req.id });
             setProcessingId(null);
             if (error) {
-              Alert.alert('Errore', error.message);
+              showAlert({ title: 'Errore', message: error.message });
             } else {
-              Alert.alert('Confermato', `${req.full_name} è ora uno dei tuoi atleti!`);
+              showAlert({ title: 'Confermato', message: `${req.full_name} è ora uno dei tuoi atleti!` });
               setRequests((prev) => prev.filter((r) => r.id !== req.id));
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const handleReject = (req: PendingRequest) => {
-    Alert.alert(
-      'Rifiuta richiesta',
-      `Vuoi rifiutare la richiesta di ${req.full_name}?`,
-      [
+    showAlert({
+      title: 'Rifiuta richiesta',
+      message: `Vuoi rifiutare la richiesta di ${req.full_name}?`,
+      buttons: [
         { text: 'Annulla', style: 'cancel' },
         {
           text: 'Rifiuta',
@@ -117,14 +136,14 @@ export default function RequestsScreen() {
               .eq('id', req.id);
             setProcessingId(null);
             if (error) {
-              Alert.alert('Errore', error.message);
+              showAlert({ title: 'Errore', message: error.message });
             } else {
               setRequests((prev) => prev.filter((r) => r.id !== req.id));
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const renderItem = ({ item }: { item: PendingRequest }) => {
@@ -165,23 +184,28 @@ export default function RequestsScreen() {
 
   return (
     <View style={s.container}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>‹ Indietro</Text>
-        </TouchableOpacity>
-        <Text style={s.title}>Richieste</Text>
-      </View>
+      <Animated.View style={{ opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
+        <View style={s.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={s.backText}>‹ Indietro</Text>
+          </TouchableOpacity>
+          <View style={s.titleWrap} pointerEvents="none"><Text style={s.title}>Richieste</Text></View>
+        </View>
+      </Animated.View>
 
       {loading ? (
         <View style={s.centered}>
           <ActivityIndicator color={colors.accent} size="large" />
         </View>
       ) : (
+        <Animated.View style={[{ flex: 1 }, { opacity: listAnim, transform: [{ translateY: listAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }]}>
         <FlatList
           data={requests}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={s.list}
+          refreshing={refreshing}
+          onRefresh={() => fetchRequests(true)}
           ListEmptyComponent={
             <View style={s.centered}>
               <Text style={s.emptyIcon}>📭</Text>
@@ -189,6 +213,7 @@ export default function RequestsScreen() {
             </View>
           }
         />
+        </Animated.View>
       )}
     </View>
   );
@@ -196,9 +221,10 @@ export default function RequestsScreen() {
 
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 24, paddingTop: 60, paddingBottom: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingTop: 60, paddingBottom: 16 },
   backText: { color: c.accent, fontSize: 16 },
-  title: { fontSize: 20, fontWeight: '800', color: c.text },
+  titleWrap: { position: 'absolute', left: 0, right: 0 },
+  title: { textAlign: 'center', fontSize: 20, fontWeight: '800', color: c.text },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyText: { color: c.textMuted, fontSize: 15 },
