@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { ThemeProvider } from '../context/ThemeContext';
@@ -49,17 +48,8 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AlertProvider>
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <Slot />
-        </KeyboardAvoidingView>
+        <Slot />
       </AlertProvider>
     </ThemeProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-});
