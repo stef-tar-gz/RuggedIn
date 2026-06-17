@@ -204,7 +204,7 @@ export default function EditWorkoutScreen() {
 
   return (
     <>
-      <ScrollView style={s.container} contentContainerStyle={s.content}>
+      <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
         <Animated.View style={{ opacity: backTitleAnim, transform: [{ translateY: backTitleAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
           <TouchableOpacity style={s.backButton} onPress={() => router.back()}>
             <Text style={s.backText}>‹ Scheda</Text>

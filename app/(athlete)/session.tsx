@@ -135,7 +135,7 @@ export default function SessionScreen() {
   }
 
   return (
-    <ScrollView style={s.container} contentContainerStyle={s.content}>
+    <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
 
       <View style={s.header}>
         <TouchableOpacity onPress={() => {
