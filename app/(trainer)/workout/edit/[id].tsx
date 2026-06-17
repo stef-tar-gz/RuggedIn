@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, ActivityIndicator, Switch, Animated
+  TouchableOpacity, ActivityIndicator, Switch, Animated, KeyboardAvoidingView, Platform
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
@@ -203,8 +203,9 @@ export default function EditWorkoutScreen() {
   }
 
   return (
+    <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
     <>
-      <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+      <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
         <Animated.View style={{ opacity: backTitleAnim, transform: [{ translateY: backTitleAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
           <TouchableOpacity style={s.backButton} onPress={() => router.back()}>
             <Text style={s.backText}>‹ Scheda</Text>
@@ -344,10 +345,12 @@ export default function EditWorkoutScreen() {
         />
       )}
     </>
+    </KeyboardAvoidingView>
   );
 }
 
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  flex: { flex: 1, backgroundColor: c.bg },
   container: { flex: 1, backgroundColor: c.bg },
   content: { paddingHorizontal: 24, paddingTop: 60, paddingBottom: 48 },
   centered: { flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' },
