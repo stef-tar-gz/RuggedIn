@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, ActivityIndicator, Switch, Animated, KeyboardAvoidingView, Platform
+  TouchableOpacity, ActivityIndicator, Animated, KeyboardAvoidingView, Platform
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
@@ -9,23 +9,15 @@ import { useProfile } from '../../../hooks/useProfile';
 import { useTheme } from '@/context/ThemeContext';
 import { useAlert } from '@/context/AlertContext';
 import ExercisePickerModal, { CatalogExercise } from '../../../components/ExercisePickerModal';
-
-type Exercise = {
-  catalog_exercise_id: string | null;
-  name: string;
-  muscle_group: string;
-  sets: string; reps: string; rest_seconds: string; notes: string;
-  has_dropset: boolean; dropset_percentage: string;
-  has_backoff: boolean; backoff_percentage: string;
-  day_index: number;
-};
+import ExerciseCardModal, { Exercise } from '../../../components/ExerciseCardModal';
 
 const emptyExercise = (day_index: number = 1): Exercise => ({
   catalog_exercise_id: null,
   name: '', muscle_group: '',
   sets: '3', reps: '10', rest_seconds: '90', notes: '',
-  has_dropset: false, dropset_percentage: '20',
-  has_backoff: false, backoff_percentage: '15',
+  has_dropset: false, dropset_percentage: '20', dropset_sets: '1',
+  has_backoff: false, backoff_percentage: '15', backoff_sets: '1',
+  has_stripping: false, stripping_steps: '2', stripping_percentage: '20', stripping_reps_increase: '0',
   day_index,
 });
 
@@ -58,6 +50,9 @@ export default function CreateWorkoutScreen() {
   // Modal picker
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerTargetIndex, setPickerTargetIndex] = useState<number | null>(null);
+
+  // Exercise card modal
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const s = makeStyles(colors);
 
@@ -143,8 +138,14 @@ export default function CreateWorkoutScreen() {
         day_index: e.day_index,
         has_dropset: e.has_dropset,
         dropset_percentage: e.has_dropset ? parseFloat(e.dropset_percentage) || null : null,
+        dropset_sets: e.has_dropset ? parseInt(e.dropset_sets) || 1 : null,
         has_backoff: e.has_backoff,
         backoff_percentage: e.has_backoff ? parseFloat(e.backoff_percentage) || null : null,
+        backoff_sets: e.has_backoff ? parseInt(e.backoff_sets) || 1 : null,
+        has_stripping: e.has_stripping,
+        stripping_steps: e.has_stripping ? parseInt(e.stripping_steps) || 2 : null,
+        stripping_percentage: e.has_stripping ? parseInt(e.stripping_percentage) || 20 : null,
+        stripping_reps_increase: e.has_stripping ? parseInt(e.stripping_reps_increase) || 0 : null,
       }))
     );
 
@@ -192,81 +193,42 @@ export default function CreateWorkoutScreen() {
                 {exercisesForDay(day).map((exercise, localIdx) => {
                   const index = flatIndexOf(day, localIdx);
                   const dayExCount = exercisesForDay(day).length;
+                  const hasTechnique = exercise.has_dropset || exercise.has_backoff;
                   return (
-                    <View key={index} style={s.exerciseCard}>
+                    <TouchableOpacity key={index} style={s.exerciseCard} activeOpacity={0.75} onPress={() => setEditingIndex(index)}>
                       <View style={s.exerciseHeader}>
-                        <Text style={s.exerciseNumber}>Esercizio {localIdx + 1}</Text>
-                        {(exercises.length > 1 || dayExCount > 1) && (
-                          <TouchableOpacity onPress={() => removeExercise(index)}>
-                            <Text style={s.removeText}>Rimuovi</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-
-                      {/* Selezione dal catalogo */}
-                      <TouchableOpacity style={[s.pickerBtn, exercise.name ? s.pickerBtnFilled : null]} onPress={() => openPicker(index)}>
-                        {exercise.name ? (
-                          <View style={{ flex: 1 }}>
-                            <Text style={s.pickerBtnName}>{exercise.name}</Text>
-                            <Text style={s.pickerBtnMuscle}>{exercise.muscle_group}</Text>
-                          </View>
-                        ) : (
-                          <Text style={s.pickerBtnPlaceholder}>Tocca per scegliere un esercizio...</Text>
-                        )}
-                        <Text style={s.pickerBtnIcon}>📋</Text>
-                      </TouchableOpacity>
-
-                      <View style={s.row}>
-                        <View style={s.rowItem}>
-                          <Text style={s.rowLabel}>Serie</Text>
-                          <TextInput style={s.inputSmall} value={exercise.sets} onChangeText={(v) => updateExercise(index, 'sets', v)} keyboardType="numeric" />
+                        <View style={s.exerciseNumberBadge}>
+                          <Text style={s.exerciseNumberText}>{localIdx + 1}</Text>
                         </View>
-                        <View style={s.rowItem}>
-                          <Text style={s.rowLabel}>Reps</Text>
-                          <TextInput style={s.inputSmall} value={exercise.reps} onChangeText={(v) => updateExercise(index, 'reps', v)} keyboardType="numeric" />
+                        <View style={{ flex: 1 }}>
+                          {exercise.name ? (
+                            <>
+                              <Text style={s.exerciseName}>{exercise.name}</Text>
+                              {exercise.muscle_group ? <Text style={s.exerciseMuscle}>{exercise.muscle_group}</Text> : null}
+                            </>
+                          ) : (
+                            <Text style={s.exercisePlaceholder}>Tocca per configurare...</Text>
+                          )}
                         </View>
-                        <View style={s.rowItem}>
-                          <Text style={s.rowLabel}>Riposo (s)</Text>
-                          <TextInput style={s.inputSmall} value={exercise.rest_seconds} onChangeText={(v) => updateExercise(index, 'rest_seconds', v)} keyboardType="numeric" />
+                        <View style={s.exerciseRight}>
+                          {exercise.sets && exercise.reps ? (
+                            <Text style={s.exercisePills}>{exercise.sets}×{exercise.reps}</Text>
+                          ) : null}
+                          {(exercises.length > 1 || dayExCount > 1) && (
+                            <TouchableOpacity onPress={() => removeExercise(index)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                              <Text style={s.removeText}>✕</Text>
+                            </TouchableOpacity>
+                          )}
                         </View>
                       </View>
-
-                      <View style={s.toggleRow}>
-                        <View>
-                          <Text style={s.toggleLabel}>Dropset</Text>
-                          <Text style={s.toggleSub}>Riduzione peso a cedimento</Text>
-                        </View>
-                        <Switch value={exercise.has_dropset} onValueChange={(v) => updateExercise(index, 'has_dropset', v)} trackColor={{ false: colors.border, true: '#E8533A55' }} thumbColor={exercise.has_dropset ? colors.accent : colors.textMuted} />
-                      </View>
-                      {exercise.has_dropset && (
-                        <View style={s.percentageRow}>
-                          <Text style={s.percentageLabel}>Riduzione peso dropset</Text>
-                          <View style={s.percentageInput}>
-                            <TextInput style={s.inputSmall} value={exercise.dropset_percentage} onChangeText={(v) => updateExercise(index, 'dropset_percentage', v)} keyboardType="decimal-pad" />
-                            <Text style={s.percentageSign}>%</Text>
-                          </View>
+                      {hasTechnique && (
+                        <View style={s.techniqueRow}>
+                          {exercise.has_dropset && <View style={s.techniquePill}><Text style={s.techniquePillText}>DS -{exercise.dropset_percentage}%</Text></View>}
+                          {exercise.has_backoff && <View style={[s.techniquePill, s.techniquePillBlue]}><Text style={[s.techniquePillText, { color: '#2196F3' }]}>BO -{exercise.backoff_percentage}%</Text></View>}
                         </View>
                       )}
-
-                      <View style={s.toggleRow}>
-                        <View>
-                          <Text style={s.toggleLabel}>Backoff</Text>
-                          <Text style={s.toggleSub}>Serie finale a volume ridotto</Text>
-                        </View>
-                        <Switch value={exercise.has_backoff} onValueChange={(v) => updateExercise(index, 'has_backoff', v)} trackColor={{ false: colors.border, true: '#E8533A55' }} thumbColor={exercise.has_backoff ? colors.accent : colors.textMuted} />
-                      </View>
-                      {exercise.has_backoff && (
-                        <View style={s.percentageRow}>
-                          <Text style={s.percentageLabel}>Riduzione peso backoff</Text>
-                          <View style={s.percentageInput}>
-                            <TextInput style={s.inputSmall} value={exercise.backoff_percentage} onChangeText={(v) => updateExercise(index, 'backoff_percentage', v)} keyboardType="decimal-pad" />
-                            <Text style={s.percentageSign}>%</Text>
-                          </View>
-                        </View>
-                      )}
-
-                      <TextInput style={s.input} placeholder="Note (opzionale)" placeholderTextColor={colors.textMuted} value={exercise.notes} onChangeText={(v) => updateExercise(index, 'notes', v)} />
-                    </View>
+                      {exercise.notes ? <Text style={s.exerciseNotePreview} numberOfLines={1}>📝 {exercise.notes}</Text> : null}
+                    </TouchableOpacity>
                   );
                 })}
 
@@ -299,6 +261,15 @@ export default function CreateWorkoutScreen() {
           onClose={() => { setPickerVisible(false); setPickerTargetIndex(null); }}
         />
       )}
+
+      <ExerciseCardModal
+        visible={editingIndex !== null}
+        exercise={editingIndex !== null ? exercises[editingIndex] : null}
+        index={editingIndex}
+        onUpdate={updateExercise}
+        onClose={() => setEditingIndex(null)}
+        onOpenPicker={(idx) => { setEditingIndex(null); openPicker(idx); }}
+      />
     </>
     </KeyboardAvoidingView>
   );
@@ -315,27 +286,21 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   sectionTitle: { fontSize: 16, fontWeight: '700', color: c.textSecondary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },
   input: { backgroundColor: c.surface, borderRadius: 10, padding: 14, color: c.text, fontSize: 15, marginBottom: 10, borderWidth: 1, borderColor: c.border },
   inputMultiline: { height: 80, textAlignVertical: 'top' },
-  exerciseCard: { backgroundColor: c.surfaceElevated, borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: c.border },
-  exerciseHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  exerciseNumber: { color: c.accent, fontSize: 14, fontWeight: '700' },
-  removeText: { color: c.textMuted, fontSize: 13 },
-  pickerBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface, borderRadius: 10, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed' },
-  pickerBtnFilled: { borderStyle: 'solid', borderColor: c.accentBorder, backgroundColor: c.accentBg },
-  pickerBtnPlaceholder: { flex: 1, color: c.textMuted, fontSize: 14 },
-  pickerBtnName: { color: c.text, fontSize: 15, fontWeight: '700' },
-  pickerBtnMuscle: { color: c.textSecondary, fontSize: 12, marginTop: 2 },
-  pickerBtnIcon: { fontSize: 18, marginLeft: 8 },
-  row: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  rowItem: { flex: 1 },
-  rowLabel: { color: c.textMuted, fontSize: 11, marginBottom: 4 },
-  inputSmall: { backgroundColor: c.surface, borderRadius: 8, padding: 10, color: c.text, fontSize: 15, borderWidth: 1, borderColor: c.border, textAlign: 'center' },
-  toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: c.surface, borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: c.border },
-  toggleLabel: { color: c.text, fontSize: 14, fontWeight: '600' },
-  toggleSub: { color: c.textMuted, fontSize: 11, marginTop: 2 },
-  percentageRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: c.surface, borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: c.accentBorder },
-  percentageLabel: { color: c.textSecondary, fontSize: 13 },
-  percentageInput: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  percentageSign: { color: c.accent, fontSize: 16, fontWeight: '700' },
+  exerciseCard: { backgroundColor: c.surfaceElevated, borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: c.border },
+  exerciseHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  exerciseNumberBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center' },
+  exerciseNumberText: { color: c.accent, fontSize: 13, fontWeight: '800' },
+  exerciseName: { color: c.text, fontSize: 15, fontWeight: '700' },
+  exerciseMuscle: { color: c.accent, fontSize: 12, marginTop: 1 },
+  exercisePlaceholder: { color: c.textMuted, fontSize: 14, fontStyle: 'italic' },
+  exerciseRight: { alignItems: 'flex-end', gap: 4 },
+  exercisePills: { color: c.textSecondary, fontSize: 13, fontWeight: '600' },
+  removeText: { color: c.textMuted, fontSize: 15 },
+  techniqueRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
+  techniquePill: { backgroundColor: c.accentBg, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  techniquePillBlue: { backgroundColor: '#2196F322' },
+  techniquePillText: { color: c.accent, fontSize: 11, fontWeight: '700' },
+  exerciseNotePreview: { color: c.textMuted, fontSize: 12, marginTop: 6, fontStyle: 'italic' },
   addExerciseButton: { borderWidth: 1, borderColor: c.accent, borderRadius: 10, borderStyle: 'dashed', padding: 16, alignItems: 'center', marginBottom: 16 },
   addExerciseText: { color: c.accent, fontSize: 15, fontWeight: '600' },
   addDayButton: { borderColor: c.textSecondary, marginTop: 8 },

@@ -20,8 +20,14 @@ type Exercise = {
   day_index: number;
   has_dropset: boolean;
   dropset_percentage: number | null;
+  dropset_sets: number | null;
   has_backoff: boolean;
   backoff_percentage: number | null;
+  backoff_sets: number | null;
+  has_stripping: boolean;
+  stripping_steps: number | null;
+  stripping_percentage: number | null;
+  stripping_reps_increase: number | null;
   catalog_exercise_id: string | null;
 };
 
@@ -70,7 +76,7 @@ export default function AthletePlanScreen() {
 
     const { data: exData } = await supabase
       .from('exercises')
-      .select('id, name, muscle_group, sets, reps, rest_seconds, notes, order_index, day_index, has_dropset, dropset_percentage, has_backoff, backoff_percentage, catalog_exercise_id, exercise_catalog(name, muscle_group, equipment, difficulty, description, video_url)')
+      .select('id, name, muscle_group, sets, reps, rest_seconds, notes, order_index, day_index, has_dropset, dropset_percentage, dropset_sets, has_backoff, backoff_percentage, backoff_sets, has_stripping, stripping_steps, stripping_percentage, stripping_reps_increase, catalog_exercise_id, exercise_catalog(name, muscle_group, equipment, difficulty, description, video_url)')
       .eq('workout_plan_id', id)
       .eq('is_deleted', false)
       .order('order_index');
@@ -164,16 +170,29 @@ export default function AthletePlanScreen() {
                       <StatPill label="Reps" value={`${exercise.reps}`} colors={colors} />
                       <StatPill label="Riposo" value={`${exercise.rest_seconds}s`} colors={colors} />
                     </View>
-                    {exercise.has_dropset && (
-                      <View style={s.techniqueBadge}>
-                        <View style={[s.techniqueIndicator, { backgroundColor: colors.accent }]} />
-                        <Text style={s.techniqueText}>Dropset -{exercise.dropset_percentage}%</Text>
-                      </View>
-                    )}
-                    {exercise.has_backoff && (
-                      <View style={s.techniqueBadge}>
-                        <View style={[s.techniqueIndicator, { backgroundColor: '#2196F3' }]} />
-                        <Text style={s.techniqueText}>Backoff -{exercise.backoff_percentage}%</Text>
+                    {(exercise.has_dropset || exercise.has_backoff || exercise.has_stripping) && (
+                      <View style={s.techniqueRow}>
+                        {exercise.has_dropset && (
+                          <View style={[s.techniquePill, { backgroundColor: colors.accentBg, borderColor: colors.accentBorder }]}>
+                            <Text style={[s.techniquePillText, { color: colors.accent }]}>
+                              🔴 DS ×{exercise.dropset_sets ?? 1}  -{exercise.dropset_percentage}%
+                            </Text>
+                          </View>
+                        )}
+                        {exercise.has_backoff && (
+                          <View style={[s.techniquePill, { backgroundColor: '#2196F318', borderColor: '#2196F344' }]}>
+                            <Text style={[s.techniquePillText, { color: '#2196F3' }]}>
+                              🔵 BO ×{exercise.backoff_sets ?? 1}  -{exercise.backoff_percentage}%
+                            </Text>
+                          </View>
+                        )}
+                        {exercise.has_stripping && (
+                          <View style={[s.techniquePill, { backgroundColor: '#9C27B018', borderColor: '#9C27B044' }]}>
+                            <Text style={[s.techniquePillText, { color: '#9C27B0' }]}>
+                              🟣 Strip {exercise.stripping_steps}× -{exercise.stripping_percentage}%{(exercise.stripping_reps_increase ?? 0) > 0 ? `  +${exercise.stripping_reps_increase}r` : ''}
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     )}
                     {exercise.notes && <Text style={s.exerciseNotes}>📝 {exercise.notes}</Text>}
@@ -241,9 +260,9 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   infoBtn: { fontSize: 16, marginLeft: 8 },
   muscleGroup: { color: c.accent, fontSize: 12, marginTop: 2 },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap' },
-  techniqueBadge: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 6 },
-  techniqueIndicator: { width: 8, height: 8, borderRadius: 4 },
-  techniqueText: { color: c.techniqueText, fontSize: 12, fontWeight: '600' },
+  techniqueRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
+  techniquePill: { flexDirection: 'row', alignItems: 'center', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1 },
+  techniquePillText: { fontSize: 12, fontWeight: '700' },
   exerciseNotes: { color: c.textMuted, fontSize: 13, marginTop: 8, fontStyle: 'italic' },
   startButton: { backgroundColor: c.accent, borderRadius: 12, padding: 18, alignItems: 'center', marginTop: 16 },
   startButtonText: { color: '#fff', fontSize: 16, fontWeight: '800' },

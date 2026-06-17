@@ -21,11 +21,17 @@ type Exercise = {
   order_index: number;
   has_dropset: boolean;
   dropset_percentage: number | null;
+  dropset_sets: number | null;
   has_backoff: boolean;
   backoff_percentage: number | null;
+  backoff_sets: number | null;
+  has_stripping: boolean;
+  stripping_steps: number | null;
+  stripping_percentage: number | null;
+  stripping_reps_increase: number | null;
 };
 
-type SetLog = { set_type: 'normal' | 'dropset' | 'backoff'; reps_done: string; weight_used_kg: string };
+type SetLog = { set_type: 'normal' | 'dropset' | 'backoff' | 'stripping'; reps_done: string; weight_used_kg: string };
 type ExerciseLog = { exercise: Exercise; sets: SetLog[] };
 
 export default function SessionScreen() {
@@ -57,7 +63,7 @@ export default function SessionScreen() {
 
     let query = supabase
       .from('exercises')
-      .select('id, name, muscle_group, sets, reps, rest_seconds, notes, order_index, has_dropset, dropset_percentage, has_backoff, backoff_percentage')
+      .select('id, name, muscle_group, sets, reps, rest_seconds, notes, order_index, has_dropset, dropset_percentage, dropset_sets, has_backoff, backoff_percentage, backoff_sets, has_stripping, stripping_steps, stripping_percentage, stripping_reps_increase')
       .eq('workout_plan_id', planId)
       .eq('is_deleted', false)
       .order('order_index');
@@ -72,8 +78,21 @@ export default function SessionScreen() {
 
   const buildInitialLog = (e: Exercise): ExerciseLog => {
     const sets: SetLog[] = Array.from({ length: e.sets }, () => ({ set_type: 'normal', reps_done: String(e.reps), weight_used_kg: '' }));
-    if (e.has_dropset) sets.push({ set_type: 'dropset', reps_done: String(e.reps), weight_used_kg: '' });
-    if (e.has_backoff) sets.push({ set_type: 'backoff', reps_done: String(e.reps), weight_used_kg: '' });
+    if (e.has_dropset) {
+      const n = e.dropset_sets ?? 1;
+      for (let i = 0; i < n; i++) sets.push({ set_type: 'dropset', reps_done: String(e.reps), weight_used_kg: '' });
+    }
+    if (e.has_backoff) {
+      const n = e.backoff_sets ?? 1;
+      for (let i = 0; i < n; i++) sets.push({ set_type: 'backoff', reps_done: String(e.reps), weight_used_kg: '' });
+    }
+    if (e.has_stripping) {
+      const steps = e.stripping_steps ?? 2;
+      const repsInc = e.stripping_reps_increase ?? 0;
+      for (let i = 0; i < steps; i++) {
+        sets.push({ set_type: 'stripping', reps_done: String(e.reps + repsInc * (i + 1)), weight_used_kg: '' });
+      }
+    }
     return { exercise: e, sets };
   };
 
@@ -192,12 +211,12 @@ export default function SessionScreen() {
           {log.sets.map((set, setIndex) => (
             <View key={setIndex} style={s.setRow}>
               <View style={[s.setTypeBadge, {
-                backgroundColor: set.set_type === 'dropset' ? colors.accentBg : set.set_type === 'backoff' ? '#2196F322' : colors.surfaceElevated
+                backgroundColor: set.set_type === 'dropset' ? colors.accentBg : set.set_type === 'backoff' ? '#2196F322' : set.set_type === 'stripping' ? '#9C27B022' : colors.surfaceElevated
               }]}>
                 <Text style={[s.setTypeText, {
-                  color: set.set_type === 'normal' ? colors.textSecondary : set.set_type === 'dropset' ? colors.accent : '#2196F3'
+                  color: set.set_type === 'normal' ? colors.textSecondary : set.set_type === 'dropset' ? colors.accent : set.set_type === 'backoff' ? '#2196F3' : '#9C27B0'
                 }]}>
-                  {set.set_type === 'normal' ? `${setIndex + 1}` : set.set_type === 'dropset' ? 'DS' : 'BO'}
+                  {set.set_type === 'normal' ? `${setIndex + 1}` : set.set_type === 'dropset' ? 'DS' : set.set_type === 'backoff' ? 'BO' : 'ST'}
                 </Text>
               </View>
               <TextInput
@@ -218,8 +237,9 @@ export default function SessionScreen() {
               />
             </View>
           ))}
-          {log.exercise.has_dropset && <Text style={s.techniqueHint}>🔴 Dropset: riduci il peso del {log.exercise.dropset_percentage}%</Text>}
-          {log.exercise.has_backoff && <Text style={s.techniqueHint}>🔵 Backoff: riduci il peso del {log.exercise.backoff_percentage}%</Text>}
+          {log.exercise.has_dropset && <Text style={s.techniqueHint}>🔴 Dropset ({log.exercise.dropset_sets ?? 1} serie): -​{log.exercise.dropset_percentage}% peso</Text>}
+          {log.exercise.has_backoff && <Text style={s.techniqueHint}>🔵 Backoff ({log.exercise.backoff_sets ?? 1} serie): -{log.exercise.backoff_percentage}% peso</Text>}
+          {log.exercise.has_stripping && <Text style={s.techniqueHint}>🟣 Stripping ({log.exercise.stripping_steps} step): -{log.exercise.stripping_percentage}% per step{(log.exercise.stripping_reps_increase ?? 0) > 0 ? `, +${log.exercise.stripping_reps_increase} reps/step` : ''}</Text>}
         </View>
       ))}
 
