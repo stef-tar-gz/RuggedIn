@@ -277,6 +277,10 @@ export default function AthleteProfileScreen() {
         <Text style={s.progressButtonText}>📈 Vedi progressi atleta</Text>
       </ScalePressable>
 
+      <ScalePressable style={s.chatButton} onPress={() => router.push({ pathname: '/(trainer)/chat/[id]', params: { id, name: athlete?.full_name ?? '' } })}>
+        <Text style={s.chatButtonText}>💬 Messaggia</Text>
+      </ScalePressable>
+
       <ScalePressable style={s.removeButton} onPress={handleRemoveAthlete}>
         <Text style={s.removeButtonText}>Rimuovi atleta</Text>
       </ScalePressable>
@@ -349,6 +353,8 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   chevron: { color: c.textSecondary, fontSize: 24 },
   progressButton: { backgroundColor: c.surface, borderRadius: 12, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: c.border, marginTop: 8 },
   progressButtonText: { color: c.text, fontSize: 15, fontWeight: '600' },
+  chatButton: { backgroundColor: c.surface, borderRadius: 12, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: c.accent, marginTop: 8 },
+  chatButtonText: { color: c.accent, fontSize: 15, fontWeight: '700' },
   removeButton: { marginTop: 12, borderRadius: 12, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: '#ff4444' },
   removeButtonText: { color: '#ff4444', fontSize: 15, fontWeight: '700' },
 });

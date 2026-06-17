@@ -150,9 +150,17 @@ export default function TrainerPublicProfileScreen() {
 
       <Animated.View style={{ opacity: statusAnim, transform: [{ translateY: statusAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
         {status === 'linked' && (
-          <View style={s.statusBtn}>
-            <Text style={s.statusBtnText}>✓ Già associato</Text>
-          </View>
+          <>
+            <View style={s.statusBtn}>
+              <Text style={s.statusBtnText}>✓ Già associato</Text>
+            </View>
+            <TouchableOpacity
+              style={s.chatBtn}
+              onPress={() => router.push({ pathname: '/(athlete)/chat/[id]', params: { id: id as string, name: trainer?.full_name ?? '' } })}
+            >
+              <Text style={s.chatBtnText}>💬 Messaggia</Text>
+            </TouchableOpacity>
+          </>
         )}
 
         {status === 'pending' && (
@@ -193,6 +201,8 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   cardLabel: { color: c.accent, fontSize: 13, fontWeight: '700', marginBottom: 8 },
   cardText: { color: c.techniqueText, fontSize: 15, lineHeight: 22 },
   roleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  chatBtn: { marginTop: 10, backgroundColor: c.surface, borderRadius: 14, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: c.accent },
+  chatBtnText: { color: c.accent, fontSize: 16, fontWeight: '700' },
   requestBtn: { marginTop: 12, backgroundColor: c.accent, borderRadius: 14, padding: 18, alignItems: 'center' },
   requestBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   statusBtn: { marginTop: 12, backgroundColor: c.surface, borderRadius: 14, padding: 18, alignItems: 'center', borderWidth: 1, borderColor: '#4CAF50' },
