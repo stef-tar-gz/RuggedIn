@@ -11,7 +11,7 @@ import { useProfile } from '../../hooks/useProfile';
 import { useTheme } from '@/context/ThemeContext';
 import { useAlert } from '@/context/AlertContext';
 
-type Athlete = { id: string; full_name: string; athlete_id: string };
+type Athlete = { id: string; full_name: string; athlete_id: string; avatar_url: string | null };
 
 export default function TrainerDashboard() {
   const { profile, loading: profileLoading } = useProfile();
@@ -66,8 +66,23 @@ export default function TrainerDashboard() {
           .eq('status', 'pending'),
       ]);
 
-      if (athletesRes.error) showAlert({ title: 'Errore', message: athletesRes.error.message });
-      else setAthletes(athletesRes.data || []);
+      if (athletesRes.error) {
+        showAlert({ title: 'Errore', message: athletesRes.error.message });
+      } else {
+        const raw: Athlete[] = athletesRes.data || [];
+        if (raw.length > 0) {
+          const ids = raw.map((a) => a.athlete_id);
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, avatar_url')
+            .in('id', ids);
+          const avatarMap: Record<string, string | null> = {};
+          (profilesData || []).forEach((p: any) => { avatarMap[p.id] = p.avatar_url; });
+          setAthletes(raw.map((a) => ({ ...a, avatar_url: avatarMap[a.athlete_id] ?? null })));
+        } else {
+          setAthletes([]);
+        }
+      }
 
       setRequestCount(reqRes.count ?? 0);
     } finally {
@@ -139,9 +154,13 @@ export default function TrainerDashboard() {
               style={s.athleteCard}
               onPress={() => router.push({ pathname: '/(trainer)/athlete/[id]', params: { id: item.athlete_id } })}
             >
-              <View style={s.athleteAvatar}>
-                <Text style={s.athleteAvatarText}>{item.full_name.charAt(0).toUpperCase()}</Text>
-              </View>
+              {item.avatar_url ? (
+                <Image source={{ uri: item.avatar_url }} style={s.athleteAvatarImg} contentFit="cover" />
+              ) : (
+                <View style={s.athleteAvatar}>
+                  <Text style={s.athleteAvatarText}>{item.full_name.charAt(0).toUpperCase()}</Text>
+                </View>
+              )}
               <View style={{ flex: 1 }}>
                 <Text style={s.athleteName}>{item.full_name}</Text>
                 <Text style={s.athleteSub}>Tocca per vedere il profilo</Text>
@@ -178,6 +197,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   emptySubtext: { color: c.textSecondary, fontSize: 14, textAlign: 'center' },
   athleteCard: { backgroundColor: c.surface, borderRadius: 12, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: c.border },
   athleteAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  athleteAvatarImg: { width: 44, height: 44, borderRadius: 22, marginRight: 14 },
   athleteAvatarText: { color: c.accent, fontSize: 18, fontWeight: '800' },
   athleteName: { color: c.text, fontSize: 16, fontWeight: '600' },
   athleteSub: { color: c.textSecondary, fontSize: 12, marginTop: 2 },
