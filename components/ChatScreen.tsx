@@ -74,7 +74,7 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
             (msg.sender_id === myId && msg.receiver_id === otherUserId) ||
             (msg.sender_id === otherUserId && msg.receiver_id === myId);
           if (!isRelevant) return;
-          setMessages(prev => [...prev, msg]);
+          setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
           if (msg.sender_id === otherUserId) {
             supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', msg.id);
           }
@@ -95,9 +95,26 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
     if (!text.trim() || !myId) return;
     const content = text.trim();
     setText('');
-    setSending(true);
-    await supabase.from('messages').insert({ sender_id: myId, receiver_id: otherUserId, content });
-    setSending(false);
+
+    const optimistic: Message = {
+      id: `tmp_${Date.now()}`,
+      sender_id: myId,
+      receiver_id: otherUserId,
+      content,
+      created_at: new Date().toISOString(),
+      read_at: null,
+    };
+    setMessages(prev => [...prev, optimistic]);
+
+    const { data } = await supabase
+      .from('messages')
+      .insert({ sender_id: myId, receiver_id: otherUserId, content })
+      .select('id, sender_id, receiver_id, content, created_at, read_at')
+      .single();
+
+    if (data) {
+      setMessages(prev => prev.map(m => m.id === optimistic.id ? data : m));
+    }
   };
 
   const formatTime = (iso: string) => {
