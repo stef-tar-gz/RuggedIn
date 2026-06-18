@@ -67,13 +67,9 @@ export default function AdminDashboard() {
           <Text style={s.headerLabel}>Pannello Admin</Text>
           <Text style={s.headerName}>{profile?.full_name}</Text>
         </View>
-        {profile?.avatar_url ? (
-          <Image source={{ uri: profile.avatar_url }} style={s.avatar} />
-        ) : (
-          <View style={[s.avatar, s.avatarFallback]}>
-            <Text style={s.avatarInitial}>{profile?.full_name?.[0]?.toUpperCase()}</Text>
-          </View>
-        )}
+        <TouchableOpacity style={s.settingsBtn} onPress={() => router.push('/(admin)/settings')}>
+          <Text style={s.settingsIcon}>⚙️</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
@@ -128,9 +124,8 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   },
   headerLabel: { fontSize: 13, color: c.accent, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
   headerName: { fontSize: 22, fontWeight: '800', color: c.text, marginTop: 2 },
-  avatar: { width: 44, height: 44, borderRadius: 22 },
-  avatarFallback: { backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { color: c.accent, fontWeight: '800', fontSize: 18 },
+  settingsBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  settingsIcon: { fontSize: 24 },
   scroll: { padding: 20, paddingBottom: 40 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: c.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
