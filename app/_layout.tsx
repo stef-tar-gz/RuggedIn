@@ -18,16 +18,19 @@ export default function RootLayout() {
 
       const inTrainer = segments[0] === '(trainer)';
       const inAthlete = segments[0] === '(athlete)';
+      const inAdmin   = segments[0] === '(admin)';
 
-      if (inTrainer || inAthlete) return;
+      if (inTrainer || inAthlete || inAdmin) return;
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, is_admin')
         .eq('auth_user_id', session.user.id)
         .single();
 
-      if (profile?.role === 'trainer') {
+      if (profile?.is_admin) {
+        router.replace('/(admin)/dashboard');
+      } else if (profile?.role === 'trainer') {
         router.replace('/(trainer)/dashboard');
       } else if (profile?.role === 'athlete') {
         router.replace('/(athlete)/plans');
