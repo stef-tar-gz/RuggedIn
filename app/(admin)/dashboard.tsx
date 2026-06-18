@@ -37,7 +37,7 @@ export default function AdminDashboard() {
     Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
   }, []);
 
-  useFocusEffect(fetchMetrics);
+  useFocusEffect(useCallback(() => { fetchMetrics(); }, [fetchMetrics]));
 
   if (profileLoading) {
     return <View style={s.center}><ActivityIndicator color={colors.accent} /></View>;

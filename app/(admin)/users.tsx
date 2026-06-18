@@ -41,7 +41,7 @@ export default function AdminUsers() {
     setLoading(false);
   }, []);
 
-  useFocusEffect(fetchUsers);
+  useFocusEffect(useCallback(() => { fetchUsers(); }, [fetchUsers]));
 
   const filtered = users.filter(u =>
     u.full_name?.toLowerCase().includes(search.toLowerCase())

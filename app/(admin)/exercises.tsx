@@ -58,7 +58,7 @@ export default function AdminExercises() {
     setLoading(false);
   }, []);
 
-  useFocusEffect(fetchExercises);
+  useFocusEffect(useCallback(() => { fetchExercises(); }, [fetchExercises]));
 
   const filtered = exercises.filter(e =>
     e.name.toLowerCase().includes(search.toLowerCase()) ||
