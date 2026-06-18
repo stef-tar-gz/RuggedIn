@@ -22,18 +22,30 @@ export default function RootLayout() {
 
       if (inTrainer || inAthlete || inAdmin) return;
 
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('role, is_admin, is_banned')
         .eq('auth_user_id', session.user.id)
         .single();
+
+      // Se la query fallisce (es. colonna non ancora migrata) prova senza i campi opzionali
+      if (error || !profile) {
+        const { data: fallback } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('auth_user_id', session.user.id)
+          .single();
+        if (fallback?.role === 'trainer') router.replace('/(trainer)/dashboard');
+        else if (fallback?.role === 'athlete') router.replace('/(athlete)/plans');
+        return;
+      }
 
       if ((profile as any)?.is_banned) {
         await supabase.auth.signOut();
         return;
       }
 
-      if (profile?.is_admin) {
+      if ((profile as any)?.is_admin) {
         router.replace('/(admin)/dashboard');
       } else if (profile?.role === 'trainer') {
         router.replace('/(trainer)/dashboard');
