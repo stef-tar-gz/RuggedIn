@@ -67,17 +67,17 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
       .channel(`chat_${myId}_${otherUserId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id=eq.${myId}`,
+        },
         (payload) => {
           const msg = payload.new as Message;
-          const isRelevant =
-            (msg.sender_id === myId && msg.receiver_id === otherUserId) ||
-            (msg.sender_id === otherUserId && msg.receiver_id === myId);
-          if (!isRelevant) return;
+          if (msg.sender_id !== otherUserId) return;
           setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
-          if (msg.sender_id === otherUserId) {
-            supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', msg.id);
-          }
+          supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', msg.id);
         }
       )
       .subscribe();
