@@ -64,7 +64,7 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
     if (!myId) return;
 
     const channel = supabase
-      .channel(`chat_${myId}_${otherUserId}`)
+      .channel(`chat_${myId}_${otherUserId}`, { config: { broadcast: { self: false } } })
       .on(
         'postgres_changes',
         {
@@ -80,7 +80,12 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
           supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', msg.id);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          // riprova dopo 3 secondi se la subscription fallisce
+          setTimeout(() => channel.subscribe(), 3000);
+        }
+      });
 
     return () => { supabase.removeChannel(channel); };
   }, [myId, otherUserId]);
