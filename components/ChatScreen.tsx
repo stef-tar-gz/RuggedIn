@@ -60,34 +60,28 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
     fetchMessages();
   }, [fetchMessages]);
 
+  // Polling ogni 3 secondi per i nuovi messaggi
   useEffect(() => {
     if (!myId) return;
+    const interval = setInterval(async () => {
+      const { data } = await supabase
+        .from('messages')
+        .select('id, sender_id, content, created_at, read_at')
+        .or(`and(sender_id.eq.${myId},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${myId})`)
+        .order('created_at', { ascending: true });
 
-    const channel = supabase
-      .channel(`chat_${myId}_${otherUserId}`, { config: { broadcast: { self: false } } })
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `receiver_id=eq.${myId}`,
-        },
-        (payload) => {
-          const msg = payload.new as Message;
-          if (msg.sender_id !== otherUserId) return;
-          setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
-          supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', msg.id);
+      if (!data) return;
+      setMessages(prev => {
+        if (data.length === prev.length) return prev;
+        const unread = data.filter(m => m.sender_id === otherUserId && !m.read_at).map(m => m.id);
+        if (unread.length > 0) {
+          supabase.from('messages').update({ read_at: new Date().toISOString() }).in('id', unread);
         }
-      )
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
-          // riprova dopo 3 secondi se la subscription fallisce
-          setTimeout(() => channel.subscribe(), 3000);
-        }
+        return data;
       });
+    }, 3000);
 
-    return () => { supabase.removeChannel(channel); };
+    return () => clearInterval(interval);
   }, [myId, otherUserId]);
 
   useEffect(() => {
