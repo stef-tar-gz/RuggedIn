@@ -4,6 +4,7 @@ import {
   TouchableOpacity, KeyboardAvoidingView, Platform,
   ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/hooks/useProfile';
@@ -40,14 +41,17 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
   const myId = profile?.id;
   const { isOnline } = usePresence(myId);
   const [otherLastSeen, setOtherLastSeen] = useState<string | null>(null);
+  const [otherAvatarUrl, setOtherAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     supabase
       .from('profiles')
-      .select('last_seen')
+      .select('avatar_url')
       .eq('id', otherUserId)
       .single()
-      .then(({ data }) => setOtherLastSeen(data?.last_seen ?? null));
+      .then(({ data }) => {
+        setOtherAvatarUrl(data?.avatar_url ?? null);
+      });
   }, [otherUserId]);
 
   const fetchMessages = useCallback(async () => {
@@ -83,13 +87,13 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
         .order('created_at', { ascending: true });
 
       if (!data) return;
+      const unread = data.filter(m => m.sender_id === otherUserId && !m.read_at).map(m => m.id);
+      if (unread.length > 0) {
+        await supabase.from('messages').update({ read_at: new Date().toISOString() }).in('id', unread);
+      }
       setMessages(prev => {
-        if (data.length === prev.length) return prev;
-        const unread = data.filter(m => m.sender_id === otherUserId && !m.read_at).map(m => m.id);
-        if (unread.length > 0) {
-          supabase.from('messages').update({ read_at: new Date().toISOString() }).in('id', unread);
-        }
-        return data;
+        const pending = prev.filter(m => m.id.startsWith('tmp_'));
+        return pending.length > 0 ? [...data, ...pending] : data;
       });
     }, 3000);
 
@@ -103,12 +107,14 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
   }, [messages]);
 
   const handleSend = async () => {
-    if (!text.trim() || !myId) return;
+    if (!text.trim() || !myId || sending) return;
     const content = text.trim();
     setText('');
+    setSending(true);
 
+    const tmpId = `tmp_${Date.now()}`;
     const optimistic: Message = {
-      id: `tmp_${Date.now()}`,
+      id: tmpId,
       sender_id: myId,
       receiver_id: otherUserId,
       content,
@@ -124,8 +130,9 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
       .single();
 
     if (data) {
-      setMessages(prev => prev.map(m => m.id === optimistic.id ? data : m));
+      setMessages(prev => prev.map(m => m.id === tmpId ? data : m));
     }
+    setSending(false);
   };
 
   const formatLastSeen = (iso: string) => {
@@ -180,7 +187,10 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
         <View style={s.headerCenter}>
           <View style={s.headerAvatarWrap}>
             <View style={s.headerAvatar}>
-              <Text style={s.headerAvatarText}>{otherUserName.charAt(0).toUpperCase()}</Text>
+              {otherAvatarUrl
+                ? <Image source={{ uri: otherAvatarUrl }} style={s.headerAvatarImg} contentFit="cover" />
+                : <Text style={s.headerAvatarText}>{otherUserName.charAt(0).toUpperCase()}</Text>
+              }
             </View>
             {isOnline(otherUserId) && <View style={s.onlineDot} />}
           </View>
@@ -217,9 +227,19 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
               <Text style={[s.bubbleText, isMine ? s.bubbleTextMine : s.bubbleTextTheirs]}>
                 {item.content}
               </Text>
-              <Text style={[s.bubbleTime, isMine ? s.bubbleTimeMine : s.bubbleTimeTheirs]}>
-                {formatTime(item.created_at)}{isMine ? (item.read_at ? '  ✓✓' : '  ✓') : ''}
-              </Text>
+              <View style={s.bubbleFooter}>
+                <Text style={[s.bubbleTime, isMine ? s.bubbleTimeMine : s.bubbleTimeTheirs]}>
+                  {formatTime(item.created_at)}
+                </Text>
+                {isMine && (
+                  <Text style={[
+                    s.statusIcon,
+                    item.id.startsWith('tmp_') ? s.statusPending : item.read_at ? s.statusRead : s.statusSent,
+                  ]}>
+                    {item.id.startsWith('tmp_') ? '🕐' : item.read_at ? '✓✓' : '✓'}
+                  </Text>
+                )}
+              </View>
             </View>
           );
         }}
@@ -265,7 +285,8 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   backText: { color: c.accent, fontSize: 28, lineHeight: 32 },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerAvatarWrap: { position: 'relative' },
-  headerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center' },
+  headerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  headerAvatarImg: { width: 36, height: 36, borderRadius: 18 },
   headerAvatarText: { color: c.accent, fontSize: 16, fontWeight: '800' },
   onlineDot: { position: 'absolute', bottom: 0, right: 0, width: 11, height: 11, borderRadius: 6, backgroundColor: '#22c55e', borderWidth: 2, borderColor: c.surface },
   headerName: { color: c.text, fontSize: 15, fontWeight: '700' },
@@ -283,9 +304,14 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   bubbleText: { fontSize: 15, lineHeight: 21 },
   bubbleTextMine: { color: '#fff' },
   bubbleTextTheirs: { color: c.text },
-  bubbleTime: { fontSize: 10, marginTop: 4 },
-  bubbleTimeMine: { color: 'rgba(255,255,255,0.6)', textAlign: 'right' },
+  bubbleFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 4 },
+  bubbleTime: { fontSize: 10 },
+  bubbleTimeMine: { color: 'rgba(255,255,255,0.6)' },
   bubbleTimeTheirs: { color: c.textMuted },
+  statusIcon: { fontSize: 12 },
+  statusPending: { color: 'rgba(255,255,255,0.5)' },
+  statusSent: { color: 'rgba(255,255,255,0.7)' },
+  statusRead: { color: '#60d4fa' },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
