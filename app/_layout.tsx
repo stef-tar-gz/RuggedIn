@@ -24,9 +24,14 @@ export default function RootLayout() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role, is_admin')
+        .select('role, is_admin, is_banned')
         .eq('auth_user_id', session.user.id)
         .single();
+
+      if ((profile as any)?.is_banned) {
+        await supabase.auth.signOut();
+        return;
+      }
 
       if (profile?.is_admin) {
         router.replace('/(admin)/dashboard');
