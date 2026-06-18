@@ -48,7 +48,6 @@ export default function MyExercisesScreen() {
     }
   }, [loading]);
 
-  // Modal state (create/edit)
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -64,56 +63,35 @@ export default function MyExercisesScreen() {
   const fetchExercises = async () => {
     if (!profile) { setLoading(false); return; }
     setLoading(true);
-    const { data } = await supabase
-      .from('exercise_catalog')
-      .select('*')
-      .eq('trainer_id', profile.id)
-      .order('name');
+    const { data } = await supabase.from('exercise_catalog').select('*').eq('trainer_id', profile.id).order('name');
     setExercises(data ?? []);
     setLoading(false);
   };
 
   const openCreate = () => {
-    setEditingId(null);
-    setName(''); setMuscle(''); setEquipment('');
+    setEditingId(null); setName(''); setMuscle(''); setEquipment('');
     setDifficulty('intermedio'); setDescription(''); setVideoUrl('');
     setModalVisible(true);
   };
 
   const openEdit = (ex: CustomExercise) => {
-    setEditingId(ex.id);
-    setName(ex.name); setMuscle(ex.muscle_group); setEquipment(ex.equipment);
+    setEditingId(ex.id); setName(ex.name); setMuscle(ex.muscle_group); setEquipment(ex.equipment);
     setDifficulty(ex.difficulty); setDescription(ex.description ?? ''); setVideoUrl(ex.video_url ?? '');
     setModalVisible(true);
   };
 
   const handleSave = async () => {
     if (!name.trim() || !muscle || !equipment.trim()) {
-      showAlert({ title: 'Attenzione', message: 'Nome, gruppo muscolare e attrezzatura sono obbligatori.' });
-      return;
+      showAlert({ title: 'Attenzione', message: 'Nome, gruppo muscolare e attrezzatura sono obbligatori.' }); return;
     }
     setSaving(true);
-    const payload = {
-      name: name.trim(),
-      muscle_group: muscle,
-      equipment: equipment.trim(),
-      difficulty,
-      description: description.trim() || null,
-      video_url: videoUrl.trim() || null,
-      trainer_id: profile!.id,
-    };
-
+    const payload = { name: name.trim(), muscle_group: muscle, equipment: equipment.trim(), difficulty, description: description.trim() || null, video_url: videoUrl.trim() || null, trainer_id: profile!.id };
     let error;
-    if (editingId) {
-      ({ error } = await supabase.from('exercise_catalog').update(payload).eq('id', editingId));
-    } else {
-      ({ error } = await supabase.from('exercise_catalog').insert(payload));
-    }
-
+    if (editingId) { ({ error } = await supabase.from('exercise_catalog').update(payload).eq('id', editingId)); }
+    else { ({ error } = await supabase.from('exercise_catalog').insert(payload)); }
     setSaving(false);
     if (error) { showAlert({ title: 'Errore', message: error.message }); return; }
-    setModalVisible(false);
-    fetchExercises();
+    setModalVisible(false); fetchExercises();
   };
 
   const handleDelete = (ex: CustomExercise) => {
@@ -122,38 +100,31 @@ export default function MyExercisesScreen() {
       message: `Eliminare "${ex.name}"? Non sarà più disponibile nelle schede future.`,
       buttons: [
         { text: 'Annulla', style: 'cancel' },
-        {
-          text: 'Elimina', style: 'destructive',
-          onPress: async () => {
-            await supabase.from('exercise_catalog').delete().eq('id', ex.id);
-            fetchExercises();
-          },
-        },
+        { text: 'Elimina', style: 'destructive', onPress: async () => { await supabase.from('exercise_catalog').delete().eq('id', ex.id); fetchExercises(); } },
       ],
     });
   };
 
   const renderExercise = ({ item }: { item: CustomExercise }) => (
     <View style={s.card}>
+      <View style={s.cardLeft}>
+        <View style={[s.diffDot, { backgroundColor: difficultyColor(item.difficulty) }]} />
+      </View>
       <View style={s.cardBody}>
         <Text style={s.exerciseName}>{item.name}</Text>
         <View style={s.meta}>
           <Text style={s.metaText}>{item.muscle_group}</Text>
           <Text style={s.metaDot}>·</Text>
           <Text style={s.metaText}>{item.equipment}</Text>
-          <Text style={s.metaDot}>·</Text>
-          <Text style={[s.difficulty, { color: difficultyColor(item.difficulty) }]}>{item.difficulty}</Text>
         </View>
-        {item.description && (
-          <Text style={s.description} numberOfLines={2}>{item.description}</Text>
-        )}
+        {item.description ? <Text style={s.description} numberOfLines={2}>{item.description}</Text> : null}
       </View>
       <View style={s.cardActions}>
         <TouchableOpacity style={s.editBtn} onPress={() => openEdit(item)}>
-          <Text style={s.editBtnText}>✏️</Text>
+          <Text style={s.editBtnText}>✎</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.deleteBtn} onPress={() => handleDelete(item)}>
-          <Text style={s.deleteBtnText}>🗑️</Text>
+          <Text style={s.deleteBtnText}>✕</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -176,7 +147,7 @@ export default function MyExercisesScreen() {
       {loading ? (
         <View style={s.centered}><ActivityIndicator color={colors.accent} size="large" /></View>
       ) : exercises.length === 0 ? (
-        <Animated.View style={[{ flex: 1 }, { opacity: listAnim, transform: [{ translateY: listAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }]}>
+        <Animated.View style={[{ flex: 1 }, { opacity: listAnim }]}>
           <View style={s.centered}>
             <Text style={s.emptyIcon}>💪</Text>
             <Text style={s.emptyTitle}>Nessun esercizio custom</Text>
@@ -187,79 +158,67 @@ export default function MyExercisesScreen() {
           </View>
         </Animated.View>
       ) : (
-        <Animated.View style={[{ flex: 1 }, { opacity: listAnim, transform: [{ translateY: listAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }]}>
-        <FlatList
-          data={exercises}
-          keyExtractor={item => item.id}
-          renderItem={renderExercise}
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-        />
+        <Animated.View style={[{ flex: 1 }, { opacity: listAnim }]}>
+          <FlatList
+            data={exercises}
+            keyExtractor={item => item.id}
+            renderItem={renderExercise}
+            contentContainerStyle={{ padding: 24, paddingBottom: 100, gap: 12 }}
+            showsVerticalScrollIndicator={false}
+          />
         </Animated.View>
       )}
 
-      {/* Modal crea/modifica */}
+      {/* FAB */}
+      {exercises.length > 0 && (
+        <TouchableOpacity style={s.fab} onPress={openCreate} activeOpacity={0.85}>
+          <Text style={s.fabText}>+</Text>
+        </TouchableOpacity>
+      )}
+
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={s.modalContainer}>
             <View style={s.modalHeader}>
-              <Text style={s.modalTitle}>{editingId ? 'Modifica esercizio' : 'Nuovo esercizio'}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Text style={s.modalClose}>✕</Text>
+                <Text style={s.modalCancel}>Annulla</Text>
+              </TouchableOpacity>
+              <Text style={s.modalTitle}>{editingId ? 'Modifica' : 'Nuovo esercizio'}</Text>
+              <TouchableOpacity onPress={handleSave} disabled={saving}>
+                {saving ? <ActivityIndicator color={colors.accent} /> : <Text style={s.modalSave}>Salva</Text>}
               </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={s.modalContent}>
-              <Text style={s.label}>Nome *</Text>
-              <TextInput style={s.input} value={name} onChangeText={setName}
-                placeholder="Es. Curl con elastico" placeholderTextColor={colors.textMuted} />
+              <Text style={s.label}>NOME *</Text>
+              <TextInput style={s.input} value={name} onChangeText={setName} placeholder="Es. Curl con elastico" placeholderTextColor={colors.textMuted} />
 
-              <Text style={s.label}>Gruppo muscolare *</Text>
+              <Text style={s.label}>GRUPPO MUSCOLARE *</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
                 {MUSCLE_GROUPS.map(m => (
-                  <TouchableOpacity
-                    key={m}
-                    style={[s.chip, muscle === m && s.chipActive]}
-                    onPress={() => setMuscle(m)}
-                  >
+                  <TouchableOpacity key={m} style={[s.chip, muscle === m && s.chipActive]} onPress={() => setMuscle(m)}>
                     <Text style={[s.chipText, muscle === m && s.chipTextActive]}>{m}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
 
-              <Text style={s.label}>Attrezzatura *</Text>
-              <TextInput style={s.input} value={equipment} onChangeText={setEquipment}
-                placeholder="Es. manubri, bilanciere, corpo libero..." placeholderTextColor={colors.textMuted} />
+              <Text style={s.label}>ATTREZZATURA *</Text>
+              <TextInput style={s.input} value={equipment} onChangeText={setEquipment} placeholder="Es. manubri, bilanciere, corpo libero..." placeholderTextColor={colors.textMuted} />
 
-              <Text style={s.label}>Difficoltà</Text>
+              <Text style={s.label}>DIFFICOLTÀ</Text>
               <View style={s.diffRow}>
                 {DIFFICULTIES.map(d => (
-                  <TouchableOpacity
-                    key={d}
-                    style={[s.diffBtn, difficulty === d && { borderColor: difficultyColor(d), backgroundColor: difficultyColor(d) + '22' }]}
-                    onPress={() => setDifficulty(d)}
-                  >
+                  <TouchableOpacity key={d} style={[s.diffBtn, difficulty === d && { borderColor: difficultyColor(d), backgroundColor: difficultyColor(d) + '22' }]} onPress={() => setDifficulty(d)}>
                     <Text style={[s.diffBtnText, difficulty === d && { color: difficultyColor(d) }]}>{d}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={s.label}>Descrizione esecuzione</Text>
-              <TextInput
-                style={[s.input, { height: 100, textAlignVertical: 'top' }]}
-                value={description} onChangeText={setDescription}
-                placeholder="Spiega come eseguire l'esercizio..." placeholderTextColor={colors.textMuted}
-                multiline numberOfLines={4}
-              />
+              <Text style={s.label}>DESCRIZIONE</Text>
+              <TextInput style={[s.input, { height: 100, textAlignVertical: 'top', paddingTop: 14 }]} value={description} onChangeText={setDescription} placeholder="Spiega come eseguire l'esercizio..." placeholderTextColor={colors.textMuted} multiline numberOfLines={4} />
 
-              <Text style={s.label}>Video URL (opzionale)</Text>
-              <TextInput style={s.input} value={videoUrl} onChangeText={setVideoUrl}
-                placeholder="https://youtube.com/..." placeholderTextColor={colors.textMuted}
-                autoCapitalize="none" keyboardType="url" />
-
-              <TouchableOpacity style={s.saveBtn} onPress={handleSave} disabled={saving}>
-                {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnText}>{editingId ? 'Salva modifiche' : 'Crea esercizio'}</Text>}
-              </TouchableOpacity>
+              <Text style={s.label}>VIDEO URL (opzionale)</Text>
+              <TextInput style={s.input} value={videoUrl} onChangeText={setVideoUrl} placeholder="https://youtube.com/..." placeholderTextColor={colors.textMuted} autoCapitalize="none" keyboardType="url" />
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -270,45 +229,54 @@ export default function MyExercisesScreen() {
 
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 60, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: c.border },
-  backText: { color: c.accent, fontSize: 16 },
-  title: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '800', color: c.text },
-  addBtn: { backgroundColor: c.accentBg, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: c.accentBorder },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 60, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: c.border },
+  backText: { color: c.accent, fontSize: 16, fontWeight: '600' },
+  title: { fontSize: 17, fontWeight: '800', color: c.text },
+  addBtn: { backgroundColor: c.accentBg, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: c.accentBorder },
   addBtnText: { color: c.accent, fontSize: 13, fontWeight: '700' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  emptyIcon: { fontSize: 48, marginBottom: 12 },
-  emptyTitle: { color: c.text, fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  emptySubtitle: { color: c.textMuted, fontSize: 14, textAlign: 'center', marginBottom: 24 },
-  emptyBtn: { backgroundColor: c.accent, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 14 },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 8 },
+  emptyIcon: { fontSize: 40 },
+  emptyTitle: { fontSize: 17, fontWeight: '700', color: c.text },
+  emptySubtitle: { fontSize: 14, color: c.textSecondary, textAlign: 'center' },
+  emptyBtn: { backgroundColor: c.accent, borderRadius: 14, height: 52, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   emptyBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  card: { backgroundColor: c.surface, borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'flex-start', borderWidth: 1, borderColor: c.border },
+  card: {
+    backgroundColor: c.surface, borderRadius: 20, borderWidth: 1, borderColor: c.border,
+    padding: 20, flexDirection: 'row', alignItems: 'flex-start',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
+  },
+  cardLeft: { paddingTop: 4, marginRight: 12 },
+  diffDot: { width: 8, height: 8, borderRadius: 4 },
   cardBody: { flex: 1 },
-  exerciseName: { color: c.text, fontSize: 15, fontWeight: '700', marginBottom: 4 },
-  meta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  metaText: { color: c.textSecondary, fontSize: 12 },
-  metaDot: { color: c.textMuted, fontSize: 12 },
-  difficulty: { fontSize: 12, fontWeight: '600' },
-  description: { color: c.textMuted, fontSize: 13, lineHeight: 18 },
-  cardActions: { flexDirection: 'row', gap: 4, marginLeft: 8 },
-  editBtn: { padding: 8 },
-  editBtnText: { fontSize: 16 },
-  deleteBtn: { padding: 8 },
-  deleteBtnText: { fontSize: 16 },
-  // Modal
+  exerciseName: { color: c.text, fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  metaText: { color: c.textSecondary, fontSize: 13 },
+  metaDot: { color: c.textMuted, fontSize: 13 },
+  description: { color: c.textMuted, fontSize: 13, lineHeight: 18, marginTop: 2 },
+  cardActions: { flexDirection: 'row', gap: 6, marginLeft: 8 },
+  editBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: c.surfaceElevated, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
+  editBtnText: { color: c.textSecondary, fontSize: 15 },
+  deleteBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#3a1515', alignItems: 'center', justifyContent: 'center' },
+  deleteBtnText: { color: '#ef4444', fontSize: 13, fontWeight: '700' },
+  fab: {
+    position: 'absolute', bottom: 32, right: 24, width: 56, height: 56, borderRadius: 28,
+    backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center',
+    shadowColor: c.accent, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8,
+  },
+  fabText: { color: '#fff', fontSize: 28, fontWeight: '300', lineHeight: 32 },
   modalContainer: { flex: 1, backgroundColor: c.bg },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 24, borderBottomWidth: 1, borderBottomColor: c.border },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: c.text },
-  modalClose: { color: c.textMuted, fontSize: 18 },
-  modalContent: { padding: 20, paddingBottom: 40 },
-  label: { color: c.textSecondary, fontSize: 12, fontWeight: '600', marginBottom: 6, marginTop: 12 },
-  input: { backgroundColor: c.surface, borderRadius: 10, padding: 14, color: c.text, fontSize: 15, borderWidth: 1, borderColor: c.border },
-  chip: { backgroundColor: c.surface, borderRadius: 20, paddingHorizontal: 14, height: 36, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: c.border },
+  modalTitle: { fontSize: 17, fontWeight: '800', color: c.text },
+  modalCancel: { color: c.textSecondary, fontSize: 16 },
+  modalSave: { color: c.accent, fontSize: 16, fontWeight: '700' },
+  modalContent: { padding: 24, paddingBottom: 48 },
+  label: { fontSize: 11, fontWeight: '800', color: c.textMuted, letterSpacing: 1.5, marginBottom: 8, marginTop: 20 },
+  input: { backgroundColor: c.surfaceElevated, borderRadius: 14, height: 52, paddingHorizontal: 16, color: c.text, fontSize: 15, borderWidth: 1, borderColor: c.border },
+  chip: { backgroundColor: c.surface, borderRadius: 20, paddingHorizontal: 16, height: 36, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: c.border },
   chipActive: { backgroundColor: c.accentBg, borderColor: c.accent },
   chipText: { color: c.textSecondary, fontSize: 13, fontWeight: '600' },
   chipTextActive: { color: c.accent },
   diffRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  diffBtn: { flex: 1, borderRadius: 8, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: c.border },
-  diffBtnText: { color: c.textSecondary, fontSize: 12, fontWeight: '600' },
-  saveBtn: { backgroundColor: c.accent, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 24 },
-  saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  diffBtn: { flex: 1, borderRadius: 12, height: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.border },
+  diffBtnText: { color: c.textSecondary, fontSize: 13, fontWeight: '600' },
 });

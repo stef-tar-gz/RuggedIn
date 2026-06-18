@@ -40,7 +40,6 @@ export default function TrainerProfileScreen() {
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [athletesLoading, setAthletesLoading] = useState(false);
 
-  // Swipeable tabs
   const [activeTab, setActiveTab] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const tabIndicator = useRef(new Animated.Value(0)).current;
@@ -58,16 +57,12 @@ export default function TrainerProfileScreen() {
 
   const goToTab = (index: number) => {
     scrollRef.current?.scrollTo({ x: index * SW, animated: true });
-    setActiveTab(index);
-    animateToTab(index);
+    setActiveTab(index); animateToTab(index);
   };
 
   const handleScroll = (e: any) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / SW);
-    if (index !== activeTab) {
-      setActiveTab(index);
-      animateToTab(index);
-    }
+    if (index !== activeTab) { setActiveTab(index); animateToTab(index); }
   };
 
   const fetchAthletes = useCallback(async () => {
@@ -93,19 +88,13 @@ export default function TrainerProfileScreen() {
 
   const handlePickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      showAlert({ title: 'Permesso negato', message: "Abilita l'accesso alla galleria nelle impostazioni." });
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7, base64: true,
-    });
+    if (!permission.granted) { showAlert({ title: 'Permesso negato', message: "Abilita l'accesso alla galleria nelle impostazioni." }); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7, base64: true });
     if (result.canceled) return;
     if (!result.assets[0].base64) { showAlert({ title: 'Errore', message: "Impossibile leggere l'immagine." }); return; }
     setUploadingImage(true);
     const asset = result.assets[0];
-    localImageUriRef.current = asset.uri;
-    setDisplayImage(asset.uri);
+    localImageUriRef.current = asset.uri; setDisplayImage(asset.uri);
     const ext = asset.uri.split('.').pop()?.toLowerCase() ?? 'jpg';
     const fileName = `${profile!.auth_user_id}/avatar.${ext}`;
     const contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
@@ -121,11 +110,8 @@ export default function TrainerProfileScreen() {
     if (!fullName.trim()) { showAlert({ title: 'Errore', message: 'Il nome non può essere vuoto.' }); return; }
     setSaving(true);
     const { error } = await supabase.from('profiles').update({
-      full_name: fullName.trim(),
-      bio: bio.trim() || null,
-      notes: notes.trim() || null,
-      instagram_handle: instagramHandle.trim().replace('@', '') || null,
-      avatar_url: avatarUrl,
+      full_name: fullName.trim(), bio: bio.trim() || null, notes: notes.trim() || null,
+      instagram_handle: instagramHandle.trim().replace('@', '') || null, avatar_url: avatarUrl,
     }).eq('id', profile!.id);
     if (error) { showAlert({ title: 'Errore', message: error.message }); }
     else { await refetch(); showAlert({ title: 'Salvato', message: 'Profilo aggiornato!' }); }
@@ -136,14 +122,10 @@ export default function TrainerProfileScreen() {
     return <View style={s.centered}><ActivityIndicator color={colors.accent} size="large" /></View>;
   }
 
-  const indicatorTranslate = tabIndicator.interpolate({
-    inputRange: [0, 1, 2],
-    outputRange: [0, TAB_W, TAB_W * 2],
-  });
+  const indicatorTranslate = tabIndicator.interpolate({ inputRange: [0, 1, 2], outputRange: [0, TAB_W, TAB_W * 2] });
 
   return (
     <View style={s.container}>
-
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()}>
@@ -152,7 +134,6 @@ export default function TrainerProfileScreen() {
         <View style={s.titleWrap} pointerEvents="none">
           <Text style={s.title}>Il mio profilo</Text>
         </View>
-        <View style={{ flex: 1 }} />
         <TouchableOpacity onPress={() => router.push('/(trainer)/settings')}>
           <Text style={s.gearIcon}>⚙️</Text>
         </TouchableOpacity>
@@ -178,11 +159,7 @@ export default function TrainerProfileScreen() {
       <View style={s.tabBar}>
         {TABS.map((tab, i) => (
           <TouchableOpacity key={tab} style={s.tabItem} onPress={() => goToTab(i)} activeOpacity={0.7}>
-            <Animated.Text style={[
-              s.tabText,
-              activeTab === i && s.tabTextActive,
-              { transform: [{ scale: tabScales[i] }, { translateY: tabTranslates[i] }] },
-            ]}>
+            <Animated.Text style={[s.tabText, activeTab === i && s.tabTextActive, { transform: [{ scale: tabScales[i] }, { translateY: tabTranslates[i] }] }]}>
               {tab}
             </Animated.Text>
           </TouchableOpacity>
@@ -191,92 +168,71 @@ export default function TrainerProfileScreen() {
       </View>
 
       {/* Pages */}
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleScroll}
-        scrollEventThrottle={16}
-        style={{ flex: 1 }}
-      >
+      <ScrollView ref={scrollRef} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={handleScroll} scrollEventThrottle={16} style={{ flex: 1 }}>
         {/* PAGE 0 — Info */}
-        <ScrollView style={s.page} contentContainerStyle={s.pageContent}>
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Dati personali</Text>
-            <Text style={s.label}>Nome completo</Text>
-            <TextInput style={s.input} value={fullName} onChangeText={setFullName} placeholder="Il tuo nome" placeholderTextColor={colors.textMuted} />
-            <Text style={s.label}>Bio</Text>
-            <TextInput style={[s.input, s.inputMultiline]} value={bio} onChangeText={setBio} placeholder="Descrivi la tua esperienza come trainer..." placeholderTextColor={colors.textMuted} multiline numberOfLines={3} />
-            <Text style={s.label}>Specializzazioni / Certificazioni</Text>
-            <TextInput style={[s.input, s.inputMultiline]} value={notes} onChangeText={setNotes} placeholder="Es. ISSA Certified, specializzato in powerlifting..." placeholderTextColor={colors.textMuted} multiline numberOfLines={3} />
-            <Text style={s.label}>Instagram</Text>
-            <TextInput style={s.input} value={instagramHandle} onChangeText={setInstagramHandle} placeholder="@tuonomeutente" placeholderTextColor={colors.textMuted} autoCapitalize="none" autoCorrect={false} />
-          </View>
+        <ScrollView style={s.page} contentContainerStyle={s.pageContent} showsVerticalScrollIndicator={false}>
+          <Text style={s.sectionLabel}>DATI PERSONALI</Text>
 
-          <TouchableOpacity style={s.saveButton} onPress={handleSave} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveButtonText}>Salva</Text>}
+          <Text style={s.fieldLabel}>Nome completo</Text>
+          <TextInput style={s.input} value={fullName} onChangeText={setFullName} placeholder="Il tuo nome" placeholderTextColor={colors.textMuted} />
+
+          <Text style={s.fieldLabel}>Bio</Text>
+          <TextInput style={[s.input, s.inputMultiline]} value={bio} onChangeText={setBio} placeholder="Descrivi la tua esperienza come trainer..." placeholderTextColor={colors.textMuted} multiline numberOfLines={3} />
+
+          <Text style={s.fieldLabel}>Specializzazioni / Certificazioni</Text>
+          <TextInput style={[s.input, s.inputMultiline]} value={notes} onChangeText={setNotes} placeholder="Es. ISSA Certified, specializzato in powerlifting..." placeholderTextColor={colors.textMuted} multiline numberOfLines={3} />
+
+          <Text style={s.fieldLabel}>Instagram</Text>
+          <TextInput style={s.input} value={instagramHandle} onChangeText={setInstagramHandle} placeholder="@tuonomeutente" placeholderTextColor={colors.textMuted} autoCapitalize="none" autoCorrect={false} />
+
+          <TouchableOpacity style={s.saveBtn} onPress={handleSave} disabled={saving}>
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveBtnText}>Salva modifiche</Text>}
           </TouchableOpacity>
         </ScrollView>
 
         {/* PAGE 1 — Atleti */}
-        <ScrollView style={s.page} contentContainerStyle={s.pageContent}>
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>I miei atleti</Text>
-            {athletesLoading ? (
-              <ActivityIndicator color={colors.accent} style={{ marginVertical: 20 }} />
-            ) : athletes.length === 0 ? (
-              <View style={s.emptyState}>
-                <Text style={s.emptyIcon}>👥</Text>
-                <Text style={s.emptyText}>Nessun atleta ancora</Text>
-                <Text style={s.emptySub}>Accetta le richieste dal dashboard</Text>
-              </View>
-            ) : (
-              athletes.map((item) => (
-                <TouchableOpacity
-                  key={item.athlete_id}
-                  style={s.athleteCard}
-                  onPress={() => router.push({ pathname: '/(trainer)/athlete/[id]', params: { id: item.athlete_id } })}
-                  activeOpacity={0.75}
-                >
-                  <View style={s.athleteAvatar}>
-                    <Text style={s.athleteAvatarText}>{item.full_name.charAt(0).toUpperCase()}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.athleteName}>{item.full_name}</Text>
-                    <Text style={s.athleteSub}>Tocca per vedere il profilo</Text>
-                  </View>
-                  <Text style={s.chevron}>›</Text>
-                </TouchableOpacity>
-              ))
-            )}
-          </View>
+        <ScrollView style={s.page} contentContainerStyle={s.pageContent} showsVerticalScrollIndicator={false}>
+          <Text style={s.sectionLabel}>I MIEI ATLETI</Text>
+          {athletesLoading ? (
+            <ActivityIndicator color={colors.accent} style={{ marginVertical: 20 }} />
+          ) : athletes.length === 0 ? (
+            <View style={s.emptyState}>
+              <Text style={s.emptyIcon}>👥</Text>
+              <Text style={s.emptyTitle}>Nessun atleta ancora</Text>
+              <Text style={s.emptySub}>Accetta le richieste dal dashboard</Text>
+            </View>
+          ) : (
+            athletes.map((item) => (
+              <TouchableOpacity key={item.athlete_id} style={s.card} onPress={() => router.push({ pathname: '/(trainer)/athlete/[id]', params: { id: item.athlete_id } })} activeOpacity={0.75}>
+                <View style={s.cardAvatar}>
+                  <Text style={s.cardAvatarText}>{item.full_name.charAt(0).toUpperCase()}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.cardName}>{item.full_name}</Text>
+                  <Text style={s.cardSub}>Tocca per vedere il profilo</Text>
+                </View>
+                <Text style={s.chevron}>›</Text>
+              </TouchableOpacity>
+            ))
+          )}
         </ScrollView>
 
         {/* PAGE 2 — Catalogo */}
-        <ScrollView style={s.page} contentContainerStyle={s.pageContent}>
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Strumenti</Text>
-            <TouchableOpacity style={s.navRow} onPress={() => router.push('/(trainer)/exercises')} activeOpacity={0.75}>
-              <Text style={s.navIcon}>💪</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={s.navLabel}>I miei esercizi</Text>
-                <Text style={s.navSub}>Gestisci il catalogo esercizi custom</Text>
-              </View>
-              <Text style={s.navChevron}>›</Text>
-            </TouchableOpacity>
-          </View>
+        <ScrollView style={s.page} contentContainerStyle={s.pageContent} showsVerticalScrollIndicator={false}>
+          <Text style={s.sectionLabel}>STRUMENTI</Text>
+          <TouchableOpacity style={s.card} onPress={() => router.push('/(trainer)/exercises')} activeOpacity={0.75}>
+            <Text style={s.navIcon}>💪</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.cardName}>I miei esercizi</Text>
+              <Text style={s.cardSub}>Gestisci il catalogo esercizi custom</Text>
+            </View>
+            <Text style={s.chevron}>›</Text>
+          </TouchableOpacity>
         </ScrollView>
       </ScrollView>
 
       {displayImage && (
-        <PhotoModal
-          visible={viewingImage}
-          uri={displayImage}
-          accentColor={colors.accent}
-          onClose={() => setViewingImage(false)}
-          onChange={() => { setViewingImage(false); handlePickImage(); }}
-        />
+        <PhotoModal visible={viewingImage} uri={displayImage} accentColor={colors.accent} onClose={() => setViewingImage(false)} onChange={() => { setViewingImage(false); handlePickImage(); }} />
       )}
     </View>
   );
@@ -285,45 +241,42 @@ export default function TrainerProfileScreen() {
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
   centered: { flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingTop: 60, paddingBottom: 12 },
-  backText: { color: c.accent, fontSize: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingTop: 60, paddingBottom: 16 },
+  backText: { color: c.accent, fontSize: 16, fontWeight: '600' },
   titleWrap: { position: 'absolute', left: 0, right: 0 },
-  title: { textAlign: 'center', fontSize: 20, fontWeight: '800', color: c.text },
+  title: { textAlign: 'center', fontSize: 18, fontWeight: '800', color: c.text },
   gearIcon: { fontSize: 22 },
-  avatarSection: { alignItems: 'center', paddingVertical: 20 },
-  avatar: { width: 90, height: 90, borderRadius: 45, borderWidth: 3, borderColor: c.accent },
-  avatarPlaceholder: { width: 90, height: 90, borderRadius: 45, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: c.accentBorder },
+  avatarSection: { alignItems: 'center', paddingVertical: 16 },
+  avatar: { width: 96, height: 96, borderRadius: 48, borderWidth: 3, borderColor: c.accent },
+  avatarPlaceholder: { width: 96, height: 96, borderRadius: 48, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: c.accentBorder },
   avatarInitial: { color: c.accent, fontSize: 36, fontWeight: '800' },
   avatarHint: { color: c.textMuted, fontSize: 12, marginTop: 6 },
-  tabBar: { flexDirection: 'row', marginHorizontal: 24, backgroundColor: c.surface, borderRadius: 12, borderWidth: 1, borderColor: c.border, overflow: 'hidden', position: 'relative', marginBottom: 4 },
-  tabItem: { flex: 1, paddingVertical: 10, alignItems: 'center' },
+  tabBar: { flexDirection: 'row', marginHorizontal: 24, backgroundColor: c.surface, borderRadius: 14, borderWidth: 1, borderColor: c.border, overflow: 'hidden', position: 'relative', marginBottom: 4 },
+  tabItem: { flex: 1, paddingVertical: 12, alignItems: 'center' },
   tabText: { fontSize: 13, fontWeight: '600', color: c.textMuted },
   tabTextActive: { color: c.accent, fontWeight: '800' },
   tabIndicator: { position: 'absolute', bottom: 0, height: 2, width: `${100 / 3}%` as any, backgroundColor: c.accent, borderRadius: 1 },
   page: { width: SW },
-  pageContent: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 48 },
-  section: { marginBottom: 28 },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: c.textSecondary, marginBottom: 14, textTransform: 'uppercase', letterSpacing: 1 },
-  label: { color: c.textSecondary, fontSize: 12, marginBottom: 6, marginTop: 4 },
-  input: { backgroundColor: c.surface, borderRadius: 10, padding: 14, color: c.text, fontSize: 15, marginBottom: 12, borderWidth: 1, borderColor: c.border },
-  inputMultiline: { height: 90, textAlignVertical: 'top' },
-  saveButton: { backgroundColor: c.accent, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
-  saveButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  // Atleti
-  emptyState: { alignItems: 'center', paddingVertical: 40 },
-  emptyIcon: { fontSize: 40, marginBottom: 10 },
-  emptyText: { color: c.text, fontSize: 15, fontWeight: '700', marginBottom: 4 },
-  emptySub: { color: c.textMuted, fontSize: 13 },
-  athleteCard: { backgroundColor: c.surface, borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: c.border },
-  athleteAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  athleteAvatarText: { color: c.accent, fontSize: 18, fontWeight: '800' },
-  athleteName: { color: c.text, fontSize: 15, fontWeight: '600' },
-  athleteSub: { color: c.textSecondary, fontSize: 12, marginTop: 2 },
-  chevron: { color: c.textSecondary, fontSize: 22 },
-  // Catalogo
-  navRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.surface, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: c.border },
-  navIcon: { fontSize: 22 },
-  navLabel: { color: c.text, fontSize: 15, fontWeight: '600' },
-  navSub: { color: c.textMuted, fontSize: 12, marginTop: 2 },
-  navChevron: { color: c.textSecondary, fontSize: 22 },
+  pageContent: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 60 },
+  sectionLabel: { fontSize: 11, fontWeight: '800', color: c.textMuted, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 16 },
+  fieldLabel: { fontSize: 11, fontWeight: '700', color: c.textMuted, letterSpacing: 0.5, marginBottom: 6, marginTop: 16 },
+  input: { backgroundColor: c.surfaceElevated, borderRadius: 14, height: 52, paddingHorizontal: 16, color: c.text, fontSize: 15, borderWidth: 1, borderColor: c.border },
+  inputMultiline: { height: 90, paddingTop: 14, textAlignVertical: 'top' },
+  saveBtn: { backgroundColor: c.accent, borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
+  saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  emptyState: { alignItems: 'center', paddingVertical: 40, gap: 8 },
+  emptyIcon: { fontSize: 40 },
+  emptyTitle: { fontSize: 17, fontWeight: '700', color: c.text },
+  emptySub: { fontSize: 14, color: c.textSecondary },
+  card: {
+    backgroundColor: c.surface, borderRadius: 20, borderWidth: 1, borderColor: c.border,
+    padding: 20, flexDirection: 'row', alignItems: 'center', marginBottom: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
+  },
+  cardAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  cardAvatarText: { color: c.accent, fontSize: 18, fontWeight: '800' },
+  cardName: { color: c.text, fontSize: 16, fontWeight: '700' },
+  cardSub: { color: c.textSecondary, fontSize: 13, marginTop: 2 },
+  chevron: { color: c.textMuted, fontSize: 24 },
+  navIcon: { fontSize: 22, marginRight: 14 },
 });
