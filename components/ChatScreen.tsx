@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/hooks/useProfile';
 import { useTheme } from '@/context/ThemeContext';
+import { usePresence } from '@/hooks/usePresence';
 
 type Message = {
   id: string;
@@ -37,6 +38,17 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
   const listRef = useRef<FlatList>(null);
 
   const myId = profile?.id;
+  const { isOnline } = usePresence(myId);
+  const [otherLastSeen, setOtherLastSeen] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from('profiles')
+      .select('last_seen')
+      .eq('id', otherUserId)
+      .single()
+      .then(({ data }) => setOtherLastSeen(data?.last_seen ?? null));
+  }, [otherUserId]);
 
   const fetchMessages = useCallback(async () => {
     if (!myId) return;
@@ -116,6 +128,14 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
     }
   };
 
+  const formatLastSeen = (iso: string) => {
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 60) return 'poco fa';
+    if (diff < 3600) return `${Math.floor(diff / 60)} min fa`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h fa`;
+    return new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+  };
+
   const formatTime = (iso: string) => {
     const d = new Date(iso);
     return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
@@ -158,10 +178,18 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
           <Text style={s.backText}>‹</Text>
         </TouchableOpacity>
         <View style={s.headerCenter}>
-          <View style={s.headerAvatar}>
-            <Text style={s.headerAvatarText}>{otherUserName.charAt(0).toUpperCase()}</Text>
+          <View style={s.headerAvatarWrap}>
+            <View style={s.headerAvatar}>
+              <Text style={s.headerAvatarText}>{otherUserName.charAt(0).toUpperCase()}</Text>
+            </View>
+            {isOnline(otherUserId) && <View style={s.onlineDot} />}
           </View>
-          <Text style={s.headerName}>{otherUserName}</Text>
+          <View>
+            <Text style={s.headerName}>{otherUserName}</Text>
+            <Text style={s.headerStatus}>
+              {isOnline(otherUserId) ? 'Online' : otherLastSeen ? `Visto ${formatLastSeen(otherLastSeen)}` : 'Offline'}
+            </Text>
+          </View>
         </View>
         <View style={{ width: 36 }} />
       </View>
@@ -236,9 +264,12 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   backBtn: { width: 36, alignItems: 'flex-start' },
   backText: { color: c.accent, fontSize: 28, lineHeight: 32 },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerAvatarWrap: { position: 'relative' },
   headerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center' },
   headerAvatarText: { color: c.accent, fontSize: 16, fontWeight: '800' },
-  headerName: { color: c.text, fontSize: 16, fontWeight: '700' },
+  onlineDot: { position: 'absolute', bottom: 0, right: 0, width: 11, height: 11, borderRadius: 6, backgroundColor: '#22c55e', borderWidth: 2, borderColor: c.surface },
+  headerName: { color: c.text, fontSize: 15, fontWeight: '700' },
+  headerStatus: { color: '#22c55e', fontSize: 11, fontWeight: '600', marginTop: 1 },
 
   messageList: { paddingHorizontal: 16, paddingVertical: 16, flexGrow: 1 },
 
