@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView,
   ActivityIndicator, TouchableOpacity, Animated
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
@@ -91,7 +92,10 @@ export default function WorkoutPlanScreen() {
       <Animated.View style={{ opacity: topRowAnim, transform: [{ translateY: topRowAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
         <View style={s.topRow}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={s.backText}>‹ Profilo atleta</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="chevron-back" size={22} color={colors.accent} />
+              <Text style={s.backText}>Profilo atleta</Text>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity style={s.editButton} onPress={() => router.push({ pathname: '/(trainer)/workout/edit/[id]', params: { id } })}>
             <Text style={s.editButtonText}>Modifica</Text>
@@ -114,7 +118,10 @@ export default function WorkoutPlanScreen() {
             </TouchableOpacity>
           </View>
           {plan?.description && <Text style={s.planDescription}>{plan.description}</Text>}
-          <Text style={s.planDate}>📅 Creata il {new Date(plan?.created_at ?? '').toLocaleDateString('it-IT')}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <Ionicons name="calendar-outline" size={13} color={colors.textMuted} />
+            <Text style={s.planDate}>Creata il {new Date(plan?.created_at ?? '').toLocaleDateString('it-IT')}</Text>
+          </View>
         </View>
 
         <View style={s.statsRow}>
@@ -145,7 +152,7 @@ export default function WorkoutPlanScreen() {
               <Text style={s.exerciseName}>{exercise.name}</Text>
               {exercise.catalog_exercise_id && (
                 <TouchableOpacity onPress={() => openInfo(exercise)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={s.infoBtn}>ℹ️</Text>
+                  <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
             </View>
@@ -167,7 +174,7 @@ export default function WorkoutPlanScreen() {
                 <Text style={s.techniqueText}>Backoff -{exercise.backoff_percentage}%</Text>
               </View>
             )}
-            {exercise.notes && <Text style={s.exerciseNotes}>📝 {exercise.notes}</Text>}
+            {exercise.notes && <Text style={s.exerciseNotes}>{exercise.notes}</Text>}
           </View>
         </View>
       ))}

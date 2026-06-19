@@ -4,6 +4,7 @@ import {
   StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
 import { useAlert } from '@/context/AlertContext';
@@ -56,7 +57,7 @@ export default function LoginScreen() {
               secureTextEntry={!showPassword}
             />
             <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPassword(v => !v)}>
-              <Text style={s.eyeIcon}>{showPassword ? '🙈' : '👁️'}</Text>
+              <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={22} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -98,7 +99,6 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   },
   passwordInput: { flex: 1, paddingHorizontal: 18, color: c.text, fontSize: 15 },
   eyeBtn: { paddingHorizontal: 16 },
-  eyeIcon: { fontSize: 18 },
   button: {
     backgroundColor: c.accent, borderRadius: 14, height: 56,
     alignItems: 'center', justifyContent: 'center', marginTop: 8,

@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, Animated, KeyboardAvoidingView, Platform
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { useProfile } from '../../../hooks/useProfile';
@@ -160,7 +161,10 @@ export default function CreateWorkoutScreen() {
       <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
         <Animated.View style={{ opacity: backTitleAnim, transform: [{ translateY: backTitleAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
           <TouchableOpacity style={s.backButton} onPress={() => router.back()}>
-            <Text style={s.backText}>‹ Profilo atleta</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="chevron-back" size={22} color={colors.accent} />
+              <Text style={s.backText}>Profilo atleta</Text>
+            </View>
           </TouchableOpacity>
           <Text style={s.title}>Nuova scheda</Text>
         </Animated.View>
@@ -184,7 +188,7 @@ export default function CreateWorkoutScreen() {
                   <Text style={s.dayHeaderText}>Giorno {day}</Text>
                   {days.length > 1 && (
                     <TouchableOpacity onPress={() => removeDay(day)} style={s.dayDeleteBtn}>
-                      <Text style={s.dayDeleteText}>🗑️</Text>
+                      <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -216,7 +220,7 @@ export default function CreateWorkoutScreen() {
                           ) : null}
                           {(exercises.length > 1 || dayExCount > 1) && (
                             <TouchableOpacity onPress={() => removeExercise(index)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                              <Text style={s.removeText}>✕</Text>
+                              <Ionicons name="close" size={18} color={colors.textMuted} />
                             </TouchableOpacity>
                           )}
                         </View>
@@ -227,7 +231,7 @@ export default function CreateWorkoutScreen() {
                           {exercise.has_backoff && <View style={[s.techniquePill, s.techniquePillBlue]}><Text style={[s.techniquePillText, { color: '#2196F3' }]}>BO -{exercise.backoff_percentage}%</Text></View>}
                         </View>
                       )}
-                      {exercise.notes ? <Text style={s.exerciseNotePreview} numberOfLines={1}>📝 {exercise.notes}</Text> : null}
+                      {exercise.notes ? <Text style={s.exerciseNotePreview} numberOfLines={1}>{exercise.notes}</Text> : null}
                     </TouchableOpacity>
                   );
                 })}

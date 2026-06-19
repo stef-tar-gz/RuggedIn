@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/hooks/useProfile';
@@ -182,7 +183,7 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Text style={s.backText}>‹</Text>
+          <Ionicons name="chevron-back" size={22} color={colors.accent} />
         </TouchableOpacity>
         <View style={s.headerCenter}>
           <View style={s.headerAvatarWrap}>
@@ -232,12 +233,11 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
                   {formatTime(item.created_at)}
                 </Text>
                 {isMine && (
-                  <Text style={[
-                    s.statusIcon,
-                    item.id.startsWith('tmp_') ? s.statusPending : item.read_at ? s.statusRead : s.statusSent,
-                  ]}>
-                    {item.id.startsWith('tmp_') ? '🕐' : item.read_at ? '✓✓' : '✓'}
-                  </Text>
+                  <Ionicons
+                    name={item.id.startsWith('tmp_') ? 'time-outline' : item.read_at ? 'checkmark-done' : 'checkmark'}
+                    size={14}
+                    color={item.read_at ? colors.accent : colors.textMuted}
+                  />
                 )}
               </View>
             </View>
@@ -245,7 +245,7 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
         }}
         ListEmptyComponent={
           <View style={s.empty}>
-            <Text style={s.emptyIcon}>💬</Text>
+            <Ionicons name="chatbubbles-outline" size={48} color={colors.textMuted} style={{ marginBottom: 12 }} />
             <Text style={s.emptyText}>Nessun messaggio ancora.</Text>
             <Text style={s.emptySub}>Inizia la conversazione!</Text>
           </View>
@@ -269,7 +269,7 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
           onPress={handleSend}
           disabled={!text.trim() || sending}
         >
-          <Text style={s.sendBtnText}>▶</Text>
+          <Ionicons name="send" size={18} color="#fff" />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

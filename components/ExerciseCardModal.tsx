@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, Modal, ScrollView, TextInput,
   TouchableOpacity, Switch, Animated, KeyboardAvoidingView, Platform, Dimensions,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/context/ThemeContext';
@@ -69,7 +70,10 @@ export default function ExerciseCardModal({ visible, exercise, index, onUpdate, 
             <View style={s.cardHeader}>
               <Text style={s.cardTitle}>{exercise.name || 'Esercizio'}</Text>
               <TouchableOpacity onPress={onClose} style={s.doneBtn}>
-                <Text style={s.doneBtnText}>Fatto ✓</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={s.doneBtnText}>Fatto</Text>
+                  <Ionicons name="checkmark" size={16} color={colors.accent} />
+                </View>
               </TouchableOpacity>
             </View>
 
@@ -84,7 +88,7 @@ export default function ExerciseCardModal({ visible, exercise, index, onUpdate, 
                 ) : (
                   <Text style={s.pickerBtnPlaceholder}>Scegli dal catalogo...</Text>
                 )}
-                <Text style={s.pickerBtnIcon}>📋</Text>
+                <Ionicons name="list-outline" size={18} color={colors.textMuted} />
               </TouchableOpacity>
 
               {/* Serie / Reps / Riposo */}

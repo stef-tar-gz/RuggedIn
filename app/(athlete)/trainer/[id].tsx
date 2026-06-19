@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Animated } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { PhotoModal } from '@/components/PhotoModal';
 import { InstagramButton } from '@/components/InstagramButton';
@@ -102,7 +103,10 @@ export default function TrainerPublicProfileScreen() {
       <Animated.View style={{ opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
         <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={s.backText}>‹ Indietro</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="chevron-back" size={22} color={colors.accent} />
+              <Text style={s.backText}>Indietro</Text>
+            </View>
           </TouchableOpacity>
           <View style={s.titleWrap} pointerEvents="none">
             <Text style={s.title}>Profilo Trainer</Text>
@@ -142,7 +146,7 @@ export default function TrainerPublicProfileScreen() {
       <Animated.View style={{ opacity: infoAnim, transform: [{ translateY: infoAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
         {trainer?.bio && (
           <View style={s.card}>
-            <Text style={s.cardLabel}>📋 Bio</Text>
+            <Text style={s.cardLabel}>Bio</Text>
             <Text style={s.cardText}>{trainer.bio}</Text>
           </View>
         )}
@@ -152,20 +156,26 @@ export default function TrainerPublicProfileScreen() {
         {status === 'linked' && (
           <>
             <View style={s.statusBtn}>
-              <Text style={s.statusBtnText}>✓ Già associato</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="checkmark" size={16} color={colors.accent} />
+                <Text style={s.statusBtnText}>Già associato</Text>
+              </View>
             </View>
             <TouchableOpacity
               style={s.chatBtn}
               onPress={() => router.push({ pathname: '/(athlete)/chat/[id]', params: { id: id as string, name: trainer?.full_name ?? '' } })}
             >
-              <Text style={s.chatBtnText}>💬 Messaggia</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="chatbubble-outline" size={18} color="#fff" />
+                <Text style={s.chatBtnText}>Messaggia</Text>
+              </View>
             </TouchableOpacity>
           </>
         )}
 
         {status === 'pending' && (
           <View style={[s.statusBtn, s.statusBtnPending]}>
-            <Text style={[s.statusBtnText, s.statusBtnTextPending]}>⏳ Richiesta inviata</Text>
+            <Text style={[s.statusBtnText, s.statusBtnTextPending]}>Richiesta inviata</Text>
           </View>
         )}
 

@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, ActivityIndicator, Animated,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
@@ -140,10 +141,10 @@ export default function RequestsScreen() {
         ) : (
           <View style={s.actions}>
             <TouchableOpacity style={s.acceptBtn} onPress={() => handleAccept(item)}>
-              <Text style={s.acceptText}>✓</Text>
+              <Ionicons name="checkmark" size={18} color="#22c55e" />
             </TouchableOpacity>
             <TouchableOpacity style={s.rejectBtn} onPress={() => handleReject(item)}>
-              <Text style={s.rejectText}>✕</Text>
+              <Ionicons name="close" size={16} color="#ef4444" />
             </TouchableOpacity>
           </View>
         )}
@@ -155,8 +156,9 @@ export default function RequestsScreen() {
     <View style={s.container}>
       <Animated.View style={{ opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={s.backText}>‹ Indietro</Text>
+          <TouchableOpacity style={{flexDirection:'row',alignItems:'center',gap:4}} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={22} color={colors.accent} />
+            <Text style={s.backText}>Indietro</Text>
           </TouchableOpacity>
           <View style={s.titleWrap} pointerEvents="none">
             <Text style={s.title}>Richieste</Text>

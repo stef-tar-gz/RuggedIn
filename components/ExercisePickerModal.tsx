@@ -3,6 +3,7 @@ import {
   Modal, View, Text, StyleSheet, FlatList, TextInput,
   TouchableOpacity, ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -132,7 +133,9 @@ export default function ExercisePickerModal({ visible, trainerId, onSelect, onCl
           <View style={s.header}>
             <Text style={s.title}>{showCreate ? 'Esercizio Custom' : 'Scegli Esercizio'}</Text>
             <TouchableOpacity onPress={showCreate ? () => setShowCreate(false) : onClose}>
-              <Text style={s.closeBtn}>{showCreate ? '‹ Indietro' : '✕'}</Text>
+              {showCreate
+                ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="chevron-back" size={22} color={colors.accent} /><Text style={s.closeBtn}>Indietro</Text></View>
+                : <Ionicons name="close" size={20} color={colors.textMuted} />}
             </TouchableOpacity>
           </View>
 
@@ -191,7 +194,7 @@ export default function ExercisePickerModal({ visible, trainerId, onSelect, onCl
               {/* Sezione fissa: search + filtri */}
               <View>
                 <View style={s.searchBar}>
-                  <Text style={s.searchIcon}>🔍</Text>
+                  <Ionicons name="search-outline" size={16} color={colors.textMuted} style={{ marginRight: 6 }} />
                   <TextInput
                     style={s.searchInput} value={search} onChangeText={setSearch}
                     placeholder="Cerca esercizio..." placeholderTextColor={colors.textMuted}
@@ -199,7 +202,7 @@ export default function ExercisePickerModal({ visible, trainerId, onSelect, onCl
                   />
                   {search.length > 0 && (
                     <TouchableOpacity onPress={() => setSearch('')}>
-                      <Text style={s.clearBtn}>✕</Text>
+                      <Ionicons name="close" size={18} color={colors.textMuted} />
                     </TouchableOpacity>
                   )}
                 </View>

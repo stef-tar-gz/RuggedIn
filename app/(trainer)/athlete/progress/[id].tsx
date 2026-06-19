@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView,
   ActivityIndicator, TouchableOpacity, Platform, Dimensions
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   VictoryLine, VictoryChart, VictoryAxis,
@@ -89,7 +90,10 @@ export default function TrainerAthleteProgressScreen() {
     <ScrollView style={s.container} contentContainerStyle={s.content}>
 
       <TouchableOpacity style={s.backButton} onPress={() => router.back()}>
-        <Text style={s.backText}>‹ Profilo atleta</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Ionicons name="chevron-back" size={22} color={colors.accent} />
+          <Text style={s.backText}>Profilo atleta</Text>
+        </View>
       </TouchableOpacity>
 
       <Text style={s.title}>Progressi</Text>
@@ -212,7 +216,10 @@ export default function TrainerAthleteProgressScreen() {
 
                   {logs.length === 1 ? (
                     <View style={s.singleSessionCard}>
-                      <Text style={s.singleSessionDate}>📅 {formatDate(logs[0].date)}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
+                        <Text style={s.singleSessionDate}>{formatDate(logs[0].date)}</Text>
+                      </View>
                       <Text style={s.singleSessionWeight}>{logs[0].maxWeight} kg</Text>
                       <Text style={s.singleSessionLabel}>Prima sessione registrata</Text>
                     </View>
@@ -244,7 +251,10 @@ export default function TrainerAthleteProgressScreen() {
                 <Text style={s.sectionTitle}>Storico dettagliato</Text>
                 {logs.slice().reverse().map((group) => (
                   <View key={group.date} style={s.logGroup}>
-                    <Text style={s.logDate}>📅 {formatDate(group.date)}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
+                      <Text style={s.logDate}>{formatDate(group.date)}</Text>
+                    </View>
                     <View style={s.logCard}>
                       <View style={s.logRowHeader}>
                         <Text style={[s.logHeaderText, { flex: 1 }]}>Tipo</Text>

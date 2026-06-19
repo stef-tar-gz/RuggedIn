@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, FlatList, TextInput,
   TouchableOpacity, ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
@@ -137,12 +138,10 @@ export default function AdminUsers() {
             onPress={() => handleBan(item)}
             activeOpacity={0.7}
           >
-            <Text style={item.is_banned ? s.unbanBtnText : s.banBtnText}>
-              {item.is_banned ? '✓' : '🚫'}
-            </Text>
+            <Ionicons name={item.is_banned ? 'checkmark' : 'ban-outline'} size={16} color={item.is_banned ? '#4CAF50' : colors.textMuted} />
           </TouchableOpacity>
           <TouchableOpacity style={s.deleteBtn} onPress={() => handleDelete(item)} activeOpacity={0.7}>
-            <Text style={s.deleteBtnText}>✕</Text>
+            <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
       )}
@@ -153,7 +152,7 @@ export default function AdminUsers() {
     <View style={s.container}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Text style={s.backText}>‹</Text>
+          <Ionicons name="chevron-back" size={22} color={colors.accent} />
         </TouchableOpacity>
         <Text style={s.title}>Utenti</Text>
         <View style={{ width: 36 }} />

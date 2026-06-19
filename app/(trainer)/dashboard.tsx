@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, ActivityIndicator, Animated,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { ScalePressable } from '@/components/ScalePressable';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -102,7 +103,7 @@ export default function TrainerDashboard() {
           <TouchableOpacity style={s.iconWrap} onPress={() => router.push('/(trainer)/requests')}>
             <Animated.View style={[s.iconRing, requestCount > 0 ? { borderColor: '#c97a00', opacity: ringOpacity } : { borderColor: '#4CAF50', opacity: 1 }]} />
             <View style={s.iconBtn}>
-              <Text style={s.iconEmoji}>✉️</Text>
+              <Ionicons name="mail-outline" size={18} color={colors.textSecondary} />
             </View>
             {requestCount > 0 && (
               <Animated.View style={[s.badge, { transform: [{ scale: pulseAnim }] }]}>
@@ -127,7 +128,7 @@ export default function TrainerDashboard() {
         <ActivityIndicator color={colors.accent} style={{ marginTop: 32 }} />
       ) : athletes.length === 0 ? (
         <View style={s.emptyState}>
-          <Text style={s.emptyIcon}>🏋️</Text>
+          <Ionicons name="barbell-outline" size={40} color={colors.textMuted} />
           <Text style={s.emptyTitle}>Nessun atleta ancora</Text>
           <Text style={s.emptySubtitle}>Gli atleti possono cercarti e inviarti una richiesta.</Text>
         </View>

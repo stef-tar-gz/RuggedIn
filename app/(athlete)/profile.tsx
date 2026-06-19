@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, Animated, Dimensions,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { PhotoModal } from '@/components/PhotoModal';
 import * as ImagePicker from 'expo-image-picker';
@@ -209,14 +210,17 @@ export default function AthleteProfileScreen() {
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>‹ Indietro</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="chevron-back" size={22} color={colors.accent} />
+            <Text style={s.backText}>Indietro</Text>
+          </View>
         </TouchableOpacity>
         <View style={s.titleWrap} pointerEvents="none">
           <Text style={s.title}>Il mio profilo</Text>
         </View>
         <View style={{ flex: 1 }} />
         <TouchableOpacity onPress={() => router.push('/(athlete)/settings')}>
-          <Text style={s.gearIcon}>⚙️</Text>
+          <Ionicons name="settings-outline" size={22} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
 
@@ -297,11 +301,11 @@ export default function AthleteProfileScreen() {
             <Text style={s.label}>Obiettivo principale</Text>
             <View style={s.optionRow}>
               {([
-                { value: 'weight_loss', label: '⚖️ Dimagrimento' },
-                { value: 'muscle_gain', label: '💪 Massa' },
-                { value: 'strength', label: '🏋️ Forza' },
-                { value: 'endurance', label: '🏃 Resistenza' },
-                { value: 'wellness', label: '🧘 Benessere' },
+                { value: 'weight_loss', label: 'Dimagrimento' },
+                { value: 'muscle_gain', label: 'Massa' },
+                { value: 'strength', label: 'Forza' },
+                { value: 'endurance', label: 'Resistenza' },
+                { value: 'wellness', label: 'Benessere' },
               ] as const).map((opt) => (
                 <TouchableOpacity
                   key={opt.value}
@@ -316,9 +320,9 @@ export default function AthleteProfileScreen() {
             <Text style={s.label}>Livello di esperienza</Text>
             <View style={s.optionRow}>
               {([
-                { value: 'beginner', label: '🌱 Principiante' },
-                { value: 'intermediate', label: '📈 Intermedio' },
-                { value: 'advanced', label: '🔥 Avanzato' },
+                { value: 'beginner', label: 'Principiante' },
+                { value: 'intermediate', label: 'Intermedio' },
+                { value: 'advanced', label: 'Avanzato' },
               ] as const).map((opt) => (
                 <TouchableOpacity
                   key={opt.value}
@@ -394,7 +398,7 @@ export default function AthleteProfileScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={s.pendingLabel}>In attesa di accettazione da</Text>
                   <Text style={s.trainerName}>{pendingRequest.trainer.full_name}</Text>
-                  <Text style={s.pendingHint}>Il trainer deve ancora accettarti ⏳</Text>
+                  <Text style={s.pendingHint}>Il trainer deve ancora accettarti</Text>
                 </View>
                 <TouchableOpacity style={s.revokeBtn} onPress={handleRevokeRequest}>
                   <Text style={s.revokeText}>Revoca</Text>
@@ -402,7 +406,7 @@ export default function AthleteProfileScreen() {
               </View>
             ) : (
               <TouchableOpacity style={s.findTrainerBtn} onPress={() => router.push('/(athlete)/find-trainer')}>
-                <Text style={s.findTrainerText}>🔍  Trova un Trainer</Text>
+                <Text style={s.findTrainerText}>Trova un Trainer</Text>
               </TouchableOpacity>
             )}
           </View>

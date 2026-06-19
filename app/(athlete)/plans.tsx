@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView,
   ActivityIndicator, Animated,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { ScalePressable } from '@/components/ScalePressable';
 import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -34,11 +35,11 @@ const DAYS_IT = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
 const MONTHS_IT = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
 
 const GOAL_LABELS: Record<string, string> = {
-  weight_loss: '⚖️ Dimagrimento',
-  muscle_gain: '💪 Massa muscolare',
-  strength: '🏋️ Forza',
-  endurance: '🏃 Resistenza',
-  wellness: '🧘 Benessere',
+  weight_loss: 'Dimagrimento',
+  muscle_gain: 'Massa muscolare',
+  strength: 'Forza',
+  endurance: 'Resistenza',
+  wellness: 'Benessere',
 };
 
 export default function PlansScreen() {
@@ -175,7 +176,7 @@ export default function PlansScreen() {
         <View style={s.header}>
           <View>
             <Text style={s.dateLabel}>{dateLabel}</Text>
-            <Text style={s.greeting}>Ciao, {profile?.full_name?.split(' ')[0]} 👋</Text>
+            <Text style={s.greeting}>Ciao, {profile?.full_name?.split(' ')[0]}</Text>
           </View>
           <ScalePressable onPress={() => router.push('/(athlete)/profile')}>
             <View style={s.avatarWrap}>
@@ -209,7 +210,10 @@ export default function PlansScreen() {
                     <Text style={s.heroPlanDesc} numberOfLines={2}>{activePlan.description}</Text>
                   ) : null}
                   <View style={s.heroFooter}>
-                    <Text style={s.heroMeta}>💪 {activePlan.exercise_count}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Ionicons name="barbell-outline" size={13} color={colors.textMuted} />
+                      <Text style={s.heroMeta}>{activePlan.exercise_count}</Text>
+                    </View>
                     {goal ? <Text style={s.heroMeta}>{GOAL_LABELS[goal]?.split(' ')[0]}</Text> : null}
                   </View>
                   <Text style={s.heroLink}>Apri →</Text>
@@ -217,7 +221,7 @@ export default function PlansScreen() {
               </ScalePressable>
             ) : (
               <View style={[s.heroCard, s.heroCardEmpty]}>
-                <Text style={s.heroEmptyIcon}>📭</Text>
+                <Ionicons name="document-outline" size={32} color={colors.textMuted} style={{ marginBottom: 8 }} />
                 <Text style={s.heroEmptyText}>Nessuna{'\n'}scheda attiva</Text>
               </View>
             )}
@@ -240,7 +244,7 @@ export default function PlansScreen() {
                 </>
               ) : (
                 <>
-                  <Text style={s.trainerEmpty}>🔍</Text>
+                  <Ionicons name="search-outline" size={26} color={colors.textMuted} />
                   <Text style={s.trainerLabel}>Trova{'\n'}Trainer</Text>
                 </>
               )}
@@ -273,7 +277,10 @@ export default function PlansScreen() {
               onPress={() => router.push({ pathname: '/(athlete)/session', params: { planId: activePlan!.id, dayIndex: String(nextDay.day_index) } })}
             >
               <View style={s.nextDayStartBtn}>
-                <Text style={s.nextDayStartText}>▶ Avvia</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="caret-forward" size={14} color="#fff" />
+                  <Text style={s.nextDayStartText}>Avvia</Text>
+                </View>
               </View>
             </ScalePressable>
           </View>
@@ -285,7 +292,7 @@ export default function PlansScreen() {
         <ScalePressable onPress={() => router.push('/(athlete)/progress')}>
           <View style={s.progressBtn}>
             <View style={s.progressBtnLeft}>
-              <Text style={s.progressBtnIcon}>📈</Text>
+              <Ionicons name="trending-up-outline" size={26} color={colors.accent} />
               <View>
                 <Text style={s.progressBtnTitle}>I miei progressi</Text>
                 <Text style={s.progressBtnSub}>Grafici, record e storico</Text>
@@ -310,7 +317,10 @@ export default function PlansScreen() {
                 <View style={s.planLeft}>
                   <Text style={s.planName}>{plan.name}</Text>
                   {plan.description && <Text style={s.planDesc} numberOfLines={1}>{plan.description}</Text>}
-                  <Text style={s.planMeta}>💪 {plan.exercise_count} esercizi · {new Date(plan.created_at).toLocaleDateString('it-IT')}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="barbell-outline" size={12} color={colors.textMuted} />
+                    <Text style={s.planMeta}>{plan.exercise_count} esercizi · {new Date(plan.created_at).toLocaleDateString('it-IT')}</Text>
+                  </View>
                 </View>
                 <Text style={s.planChevron}>›</Text>
               </ScalePressable>

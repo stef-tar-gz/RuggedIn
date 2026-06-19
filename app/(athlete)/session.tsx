@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, ActivityIndicator, Platform, KeyboardAvoidingView
+  TouchableOpacity, ActivityIndicator, Platform, KeyboardAvoidingView, Animated, Vibration, Easing,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../hooks/useProfile';
@@ -47,6 +48,18 @@ export default function SessionScreen() {
   const [saving, setSaving] = useState(false);
   const [sessionDate, setSessionDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Timer riposo
+  const [timerActive, setTimerActive] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [timerExIndex, setTimerExIndex] = useState(-1);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerReveal = useRef(new Animated.Value(0)).current;
+  const timerOpacity = useRef(new Animated.Value(0)).current;
+  const timerBorderAnim = useRef(new Animated.Value(0)).current;
+  const [borderExIndex, setBorderExIndex] = useState(-1);
+  const progressAnim = useRef(new Animated.Value(1)).current;
+  const TIMER_HEIGHT = 82;
 
   const s = makeStyles(colors);
 
@@ -95,6 +108,61 @@ export default function SessionScreen() {
     }
     return { exercise: e, sets };
   };
+
+  const collapseTimer = useCallback((onDone?: () => void) => {
+    Animated.parallel([
+      Animated.timing(timerOpacity, { toValue: 0, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(timerReveal, { toValue: 0, duration: 320, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }),
+    ]).start(() => { setTimerActive(false); setTimerExIndex(-1); onDone?.(); });
+    Animated.timing(timerBorderAnim, { toValue: 0, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: false })
+      .start(() => setBorderExIndex(-1));
+  }, [timerReveal, timerOpacity, timerBorderAnim]);
+
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    progressAnim.stopAnimation();
+    Vibration.cancel();
+    collapseTimer();
+  }, [collapseTimer, progressAnim]);
+
+  const startTimer = useCallback((restSeconds: number, exIndex: number) => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    progressAnim.stopAnimation();
+    Vibration.cancel();
+
+    setTimerSeconds(restSeconds);
+    setTimerExIndex(exIndex);
+    setTimerActive(true);
+
+    timerReveal.setValue(0);
+    timerOpacity.setValue(0);
+    setBorderExIndex(exIndex);
+    timerBorderAnim.setValue(0);
+    Animated.timing(timerBorderAnim, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }).start();
+    Animated.sequence([
+      Animated.timing(timerReveal, { toValue: TIMER_HEIGHT, duration: 420, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }),
+      Animated.timing(timerOpacity, { toValue: 1, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]).start();
+
+    progressAnim.setValue(1);
+    Animated.timing(progressAnim, { toValue: 0, duration: restSeconds * 1000, easing: Easing.linear, useNativeDriver: false }).start();
+
+    timerRef.current = setInterval(() => {
+      setTimerSeconds(prev => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          Vibration.vibrate([0, 400, 150, 400, 150, 600]);
+          collapseTimer();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [timerReveal, timerOpacity, progressAnim, collapseTimer]);
+
+  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
+
+  const formatTimer = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
   const updateSet = (exIndex: number, setIndex: number, field: keyof SetLog, value: string) => {
     setLogs(prev => {
@@ -155,6 +223,7 @@ export default function SessionScreen() {
 
   return (
     <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
+
     <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
 
       <View style={s.header}>
@@ -168,13 +237,19 @@ export default function SessionScreen() {
             ],
           });
         }}>
-          <Text style={s.backText}>✕ Abbandona</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="close" size={18} color={colors.textMuted} />
+            <Text style={s.backText}>Abbandona</Text>
+          </View>
         </TouchableOpacity>
         <Text style={s.sessionTitle}>{planName}{dayIndex ? ` — Giorno ${dayIndex}` : ''}</Text>
       </View>
 
       <TouchableOpacity style={s.dateSelector} onPress={() => setShowDatePicker(true)}>
-        <Text style={s.dateSelectorLabel}>📅 Data sessione</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <Ionicons name="calendar-outline" size={13} color={colors.textMuted} />
+          <Text style={s.dateSelectorLabel}>Data sessione</Text>
+        </View>
         <Text style={s.dateSelectorValue}>{formatDate(sessionDate)}</Text>
       </TouchableOpacity>
 
@@ -192,7 +267,12 @@ export default function SessionScreen() {
       )}
 
       {logs.map((log, exIndex) => (
-        <View key={log.exercise.id} style={s.exerciseCard}>
+        <Animated.View key={log.exercise.id} style={[s.exerciseCard, borderExIndex === exIndex && {
+          borderColor: timerBorderAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [colors.border, 'rgba(232,83,58,0.45)'],
+          })
+        }]}>
           <View style={s.exerciseHeader}>
             <View style={s.exerciseIndexBadge}>
               <Text style={s.exerciseIndexText}>{exIndex + 1}</Text>
@@ -201,8 +281,14 @@ export default function SessionScreen() {
               <Text style={s.exerciseName}>{log.exercise.name}</Text>
               {log.exercise.muscle_group && <Text style={s.muscleGroup}>{log.exercise.muscle_group}</Text>}
             </View>
+            <TouchableOpacity
+              style={[s.restBtn, timerActive && s.restBtnDisabled]}
+              disabled={timerActive}
+              onPress={() => startTimer(log.exercise.rest_seconds, exIndex)}
+            >
+              <Ionicons name="timer-outline" size={18} color={timerActive ? colors.textMuted : colors.accent} />
+            </TouchableOpacity>
           </View>
-          {log.exercise.notes && <Text style={s.exerciseNotes}>📝 {log.exercise.notes}</Text>}
           <View style={s.setHeader}>
             <Text style={[s.setHeaderText, { flex: 1 }]}>Serie</Text>
             <Text style={[s.setHeaderText, { flex: 2 }]}>Reps</Text>
@@ -237,17 +323,48 @@ export default function SessionScreen() {
               />
             </View>
           ))}
-          {log.exercise.has_dropset && <Text style={s.techniqueHint}>🔴 Dropset ({log.exercise.dropset_sets ?? 1} serie): -​{log.exercise.dropset_percentage}% peso</Text>}
-          {log.exercise.has_backoff && <Text style={s.techniqueHint}>🔵 Backoff ({log.exercise.backoff_sets ?? 1} serie): -{log.exercise.backoff_percentage}% peso</Text>}
-          {log.exercise.has_stripping && <Text style={s.techniqueHint}>🟣 Stripping ({log.exercise.stripping_steps} step): -{log.exercise.stripping_percentage}% per step{(log.exercise.stripping_reps_increase ?? 0) > 0 ? `, +${log.exercise.stripping_reps_increase} reps/step` : ''}</Text>}
-        </View>
+          {log.exercise.has_dropset && <Text style={s.techniqueHint}>Dropset ({log.exercise.dropset_sets ?? 1} serie): -{log.exercise.dropset_percentage}% peso</Text>}
+          {log.exercise.has_backoff && <Text style={s.techniqueHint}>Backoff ({log.exercise.backoff_sets ?? 1} serie): -{log.exercise.backoff_percentage}% peso</Text>}
+          {log.exercise.has_stripping && <Text style={s.techniqueHint}>Stripping ({log.exercise.stripping_steps} step): -{log.exercise.stripping_percentage}% per step{(log.exercise.stripping_reps_increase ?? 0) > 0 ? `, +${log.exercise.stripping_reps_increase} reps/step` : ''}</Text>}
+          {log.exercise.notes && (
+            <View style={s.notesBox}>
+              <View style={s.notesAccent} />
+              <Text style={s.notesText}>{log.exercise.notes}</Text>
+            </View>
+          )}
+
+          {/* Timer integrato — si espande verso il basso dalla card */}
+          {timerExIndex === exIndex && (
+            <Animated.View style={[s.timerClip, { height: timerReveal }]}>
+              <Animated.View style={[s.timerBody, { opacity: timerOpacity }]}>
+                <View style={s.timerBarBg}>
+                  <Animated.View style={[s.timerBarFill, {
+                    width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+                    backgroundColor: progressAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: ['#E8533A', '#FF9800', '#4CAF50'] }),
+                  }]} />
+                </View>
+                <View style={s.timerMain}>
+                  <View>
+                    <Text style={s.timerLabel}>Tempo di riposo</Text>
+                    <Text style={s.timerTime}>{formatTimer(timerSeconds)}</Text>
+                  </View>
+                  <TouchableOpacity style={s.timerSkip} onPress={stopTimer}>
+                    <Ionicons name="play-skip-forward" size={16} color={colors.accent} />
+                    <Text style={s.timerSkipText}>Salta</Text>
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
+            </Animated.View>
+          )}
+        </Animated.View>
       ))}
 
       <TouchableOpacity style={s.saveButton} onPress={handleSave} disabled={saving}>
-        {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveButtonText}>💾 Salva sessione</Text>}
+        {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveButtonText}>Salva sessione</Text>}
       </TouchableOpacity>
 
     </ScrollView>
+
     </KeyboardAvoidingView>
   );
 }
@@ -263,21 +380,38 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   dateSelector: { backgroundColor: c.surface, borderRadius: 12, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, borderWidth: 1, borderColor: c.border },
   dateSelectorLabel: { color: c.textSecondary, fontSize: 14 },
   dateSelectorValue: { color: c.accent, fontSize: 16, fontWeight: '700' },
-  exerciseCard: { backgroundColor: c.surface, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: c.border },
+  exerciseCard: { backgroundColor: c.surface, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: c.border, overflow: 'hidden' },
   exerciseHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 12 },
   exerciseIndexBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center' },
   exerciseIndexText: { color: c.accent, fontSize: 14, fontWeight: '800' },
   exerciseInfo: { flex: 1 },
   exerciseName: { color: c.text, fontSize: 16, fontWeight: '700' },
   muscleGroup: { color: c.accent, fontSize: 12, marginTop: 2 },
-  exerciseNotes: { color: c.textMuted, fontSize: 13, fontStyle: 'italic', marginBottom: 12 },
+  notesBox: { flexDirection: 'row', backgroundColor: c.accentBg, borderRadius: 8, marginTop: 10, marginBottom: 4, overflow: 'hidden' },
+  notesAccent: { width: 3, backgroundColor: c.accent, borderRadius: 2 },
+  notesText: { flex: 1, color: c.text, fontSize: 13, fontWeight: '500', lineHeight: 19, paddingHorizontal: 10, paddingVertical: 8 },
   setHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 6, paddingHorizontal: 4 },
   setHeaderText: { color: c.textMuted, fontSize: 11, fontWeight: '600', textTransform: 'uppercase' },
   setRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   setTypeBadge: { flex: 1, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.border },
   setTypeText: { fontSize: 13, fontWeight: '800' },
   setInput: { backgroundColor: c.surfaceElevated, borderRadius: 8, padding: 10, color: c.text, fontSize: 15, borderWidth: 1, borderColor: c.border, textAlign: 'center', height: 40 },
-  techniqueHint: { color: c.textMuted, fontSize: 12, marginTop: 8, fontStyle: 'italic' },
+  techniqueHint: { color: c.textMuted, fontSize: 12, marginTop: 6, fontStyle: 'italic' },
   saveButton: { backgroundColor: c.accent, borderRadius: 12, padding: 18, alignItems: 'center', marginTop: 8 },
   saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  restBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.accentBorder },
+  restBtnDisabled: { backgroundColor: c.surfaceElevated, borderColor: c.border, opacity: 0.5 },
+  timerClip: { overflow: 'hidden', marginHorizontal: -16, marginBottom: -16, marginTop: 16 },
+  timerBody: {
+    backgroundColor: c.accentBg,
+    paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8,
+    borderTopWidth: 1, borderTopColor: 'rgba(232,83,58,0.2)',
+  },
+  timerBarBg: { height: 4, backgroundColor: 'rgba(232,83,58,0.15)', borderRadius: 2, overflow: 'hidden', marginBottom: 10 },
+  timerBarFill: { height: 4, borderRadius: 2 },
+  timerMain: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  timerLabel: { color: c.accent, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 },
+  timerTime: { color: c.text, fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
+  timerSkip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: c.surface, borderWidth: 1, borderColor: 'rgba(232,83,58,0.3)' },
+  timerSkipText: { color: c.accent, fontSize: 13, fontWeight: '700' },
 });

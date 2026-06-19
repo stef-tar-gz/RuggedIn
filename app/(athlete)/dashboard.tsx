@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, Animated,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
@@ -26,11 +27,11 @@ const DAYS_IT = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
 const MONTHS_IT = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 
 const GOAL_LABELS: Record<string, string> = {
-  weight_loss: '⚖️ Dimagrimento',
-  muscle_gain: '💪 Massa muscolare',
-  strength: '🏋️ Forza',
-  endurance: '🏃 Resistenza',
-  wellness: '🧘 Benessere',
+  weight_loss: 'Dimagrimento',
+  muscle_gain: 'Massa muscolare',
+  strength: 'Forza',
+  endurance: 'Resistenza',
+  wellness: 'Benessere',
 };
 
 export default function AthleteDashboard() {
@@ -123,7 +124,7 @@ export default function AthleteDashboard() {
       <View style={s.header}>
         <View style={s.headerLeft}>
           <Text style={s.dateLabel}>{dateLabel}</Text>
-          <Text style={s.greeting}>Ciao, {profile?.full_name?.split(' ')[0]} 👋</Text>
+          <Text style={s.greeting}>Ciao, {profile?.full_name?.split(' ')[0]}</Text>
         </View>
         <ScalePressable onPress={() => router.push('/(athlete)/profile')}>
           <View style={s.avatarWrap}>
@@ -155,10 +156,10 @@ export default function AthleteDashboard() {
                   ) : null}
                   <View style={s.heroBadgeRow}>
                     <View style={s.heroBadge}>
-                      <Text style={s.heroBadgeText}>💪 {activePlan.exercise_count} esercizi</Text>
+                      <Text style={s.heroBadgeText}>{activePlan.exercise_count} esercizi</Text>
                     </View>
                     <View style={s.heroBadge}>
-                      <Text style={s.heroBadgeText}>📋 {planCount} schede totali</Text>
+                      <Text style={s.heroBadgeText}>{planCount} schede totali</Text>
                     </View>
                   </View>
                   <View style={s.heroAction}>
@@ -168,7 +169,7 @@ export default function AthleteDashboard() {
               </ScalePressable>
             ) : (
               <View style={s.heroEmpty}>
-                <Text style={s.heroEmptyIcon}>📭</Text>
+                <Ionicons name="document-outline" size={40} color={colors.textMuted} style={{ marginBottom: 10 }} />
                 <Text style={s.heroEmptyText}>Nessuna scheda attiva</Text>
                 <Text style={s.heroEmptySub}>Il tuo trainer non ha ancora assegnato una scheda</Text>
               </View>
@@ -187,12 +188,12 @@ export default function AthleteDashboard() {
           <Text style={s.sectionTitle}>Accesso rapido</Text>
           <View style={s.quickRow}>
             <ScalePressable style={s.quickCard} onPress={() => router.push('/(athlete)/plans')}>
-              <Text style={s.quickIcon}>📋</Text>
+              <Ionicons name="list-outline" size={26} color={colors.accent} style={{ marginBottom: 12 }} />
               <Text style={s.quickLabel}>Le mie schede</Text>
               <Text style={s.quickSub}>{planCount} totali</Text>
             </ScalePressable>
             <ScalePressable style={s.quickCard} onPress={() => router.push('/(athlete)/progress')}>
-              <Text style={s.quickIcon}>📈</Text>
+              <Ionicons name="trending-up-outline" size={26} color={colors.accent} style={{ marginBottom: 12 }} />
               <Text style={s.quickLabel}>Progressi</Text>
               <Text style={s.quickSub}>Grafici & log</Text>
             </ScalePressable>
@@ -220,7 +221,7 @@ export default function AthleteDashboard() {
           ) : (
             <ScalePressable onPress={() => router.push('/(athlete)/find-trainer')}>
               <View style={s.findTrainerCard}>
-                <Text style={s.findTrainerIcon}>🔍</Text>
+                <Ionicons name="search-outline" size={24} color={colors.accent} />
                 <View style={{ flex: 1 }}>
                   <Text style={s.findTrainerText}>Trova un trainer</Text>
                   <Text style={s.findTrainerSub}>Connettiti con un personal trainer</Text>

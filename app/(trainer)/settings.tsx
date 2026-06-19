@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
 import { useAlert } from '@/context/AlertContext';
@@ -38,8 +39,9 @@ export default function TrainerSettingsScreen() {
   return (
     <ScrollView style={s.container} contentContainerStyle={s.content}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>‹ Profilo</Text>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+          <Ionicons name="chevron-back" size={22} color={colors.accent} />
+          <Text style={s.backText}>Profilo</Text>
         </TouchableOpacity>
         <View style={{ flex: 1 }} pointerEvents="none">
           <Text style={s.title}>Impostazioni</Text>
@@ -50,7 +52,7 @@ export default function TrainerSettingsScreen() {
       <Text style={s.groupLabel}>Aspetto</Text>
       <View style={s.group}>
         <TouchableOpacity style={s.row} onPress={toggleTheme} activeOpacity={0.7}>
-          <Text style={s.rowIcon}>{isDark ? '🌙' : '☀️'}</Text>
+          <View style={s.rowIconWrap}><Ionicons name={isDark ? 'moon-outline' : 'sunny-outline'} size={22} color={colors.textSecondary} /></View>
           <View style={s.rowBody}>
             <Text style={s.rowLabel}>Tema</Text>
             <Text style={s.rowSub}>{isDark ? 'Scuro' : 'Chiaro'}</Text>
@@ -63,7 +65,7 @@ export default function TrainerSettingsScreen() {
       <Text style={s.groupLabel}>Notifiche</Text>
       <View style={s.group}>
         <View style={s.row}>
-          <Text style={s.rowIcon}>🔔</Text>
+          <View style={s.rowIconWrap}><Ionicons name="notifications-outline" size={22} color={colors.textSecondary} /></View>
           <View style={s.rowBody}>
             <Text style={s.rowLabel}>Notifiche push</Text>
             <Text style={s.rowSub}>Nuove richieste e messaggi dagli atleti</Text>
@@ -81,7 +83,7 @@ export default function TrainerSettingsScreen() {
       <Text style={s.groupLabel}>Privacy</Text>
       <View style={s.group}>
         <View style={s.row}>
-          <Text style={s.rowIcon}>👁️</Text>
+          <View style={s.rowIconWrap}><Ionicons name="eye-outline" size={22} color={colors.textSecondary} /></View>
           <View style={s.rowBody}>
             <Text style={s.rowLabel}>Profilo visibile agli atleti</Text>
             <Text style={s.rowSub}>Gli atleti possono trovarti nella ricerca</Text>
@@ -99,7 +101,7 @@ export default function TrainerSettingsScreen() {
       <Text style={s.groupLabel}>Info</Text>
       <View style={s.group}>
         <View style={[s.row]}>
-          <Text style={s.rowIcon}>📱</Text>
+          <View style={s.rowIconWrap}><Ionicons name="phone-portrait-outline" size={22} color={colors.textSecondary} /></View>
           <View style={s.rowBody}>
             <Text style={s.rowLabel}>Versione app</Text>
             <Text style={s.rowSub}>1.0.0</Text>
@@ -107,7 +109,7 @@ export default function TrainerSettingsScreen() {
         </View>
         <View style={s.separator} />
         <TouchableOpacity style={s.row} activeOpacity={0.7} onPress={() => showAlert({ title: 'Contatti', message: 'Per supporto scrivi a support@ruggedin.app' })}>
-          <Text style={s.rowIcon}>✉️</Text>
+          <View style={s.rowIconWrap}><Ionicons name="mail-outline" size={22} color={colors.textSecondary} /></View>
           <View style={s.rowBody}>
             <Text style={s.rowLabel}>Contatta il supporto</Text>
           </View>
@@ -115,7 +117,7 @@ export default function TrainerSettingsScreen() {
         </TouchableOpacity>
         <View style={s.separator} />
         <TouchableOpacity style={s.row} activeOpacity={0.7} onPress={() => showAlert({ title: 'Privacy Policy', message: 'Consulta la nostra privacy policy su ruggedin.app/privacy' })}>
-          <Text style={s.rowIcon}>🔒</Text>
+          <View style={s.rowIconWrap}><Ionicons name="lock-closed-outline" size={22} color={colors.textSecondary} /></View>
           <View style={s.rowBody}>
             <Text style={s.rowLabel}>Privacy Policy</Text>
           </View>
@@ -134,12 +136,12 @@ export default function TrainerSettingsScreen() {
             { text: 'Disconnetti', style: 'destructive', onPress: () => supabase.auth.signOut() },
           ],
         })}>
-          <Text style={s.rowIcon}>🚪</Text>
+          <View style={s.rowIconWrap}><Ionicons name="log-out-outline" size={22} color={colors.textSecondary} /></View>
           <View style={s.rowBody}><Text style={s.rowLabel}>Disconnetti</Text></View>
         </TouchableOpacity>
         <View style={s.separator} />
         <TouchableOpacity style={s.row} activeOpacity={0.7} onPress={handleDeleteAccount}>
-          <Text style={s.rowIcon}>🗑️</Text>
+          <View style={s.rowIconWrap}><Ionicons name="trash-outline" size={20} color="#ef4444" /></View>
           <View style={s.rowBody}><Text style={[s.rowLabel, { color: '#ef4444' }]}>Elimina account</Text></View>
         </TouchableOpacity>
       </View>
@@ -152,13 +154,14 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   container: { flex: 1, backgroundColor: c.bg },
   content: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 48 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 32 },
+  backBtn: { flexDirection: 'row', alignItems: 'center' },
   backText: { color: c.accent, fontSize: 16 },
   title: { textAlign: 'center', fontSize: 20, fontWeight: '800', color: c.text },
   groupLabel: { fontSize: 11, fontWeight: '700', color: c.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, marginLeft: 4 },
   group: { backgroundColor: c.surface, borderRadius: 14, borderWidth: 1, borderColor: c.border, marginBottom: 28, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
   separator: { height: 1, backgroundColor: c.border, marginHorizontal: 16 },
-  rowIcon: { fontSize: 20, width: 28, textAlign: 'center' },
+  rowIconWrap: { width: 28, alignItems: 'center', justifyContent: 'center' },
   rowBody: { flex: 1 },
   rowLabel: { fontSize: 15, fontWeight: '600', color: c.text },
   rowSub: { fontSize: 12, color: c.textMuted, marginTop: 2 },

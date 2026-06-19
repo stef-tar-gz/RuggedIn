@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView,
   ActivityIndicator, TouchableOpacity, Animated
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { ScalePressable } from '@/components/ScalePressable';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -11,16 +12,16 @@ import { useTheme } from '@/context/ThemeContext';
 import { useAlert } from '@/context/AlertContext';
 
 const GOAL_LABELS: Record<string, string> = {
-  weight_loss: '⚖️ Dimagrimento',
-  muscle_gain: '💪 Massa muscolare',
-  strength: '🏋️ Forza',
-  endurance: '🏃 Resistenza',
-  wellness: '🧘 Benessere',
+  weight_loss: 'Dimagrimento',
+  muscle_gain: 'Massa muscolare',
+  strength: 'Forza',
+  endurance: 'Resistenza',
+  wellness: 'Benessere',
 };
 const LEVEL_LABELS: Record<string, string> = {
-  beginner: '🌱 Principiante',
-  intermediate: '📈 Intermedio',
-  advanced: '🔥 Avanzato',
+  beginner: 'Principiante',
+  intermediate: 'Intermedio',
+  advanced: 'Avanzato',
 };
 
 type AthleteProfile = {
@@ -148,7 +149,10 @@ export default function AthleteProfileScreen() {
     <ScrollView style={s.container} contentContainerStyle={s.content}>
 
       <TouchableOpacity style={s.backButton} onPress={() => router.back()}>
-        <Text style={s.backText}>‹ Dashboard</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Ionicons name="chevron-back" size={22} color={colors.accent} />
+          <Text style={s.backText}>Dashboard</Text>
+        </View>
       </TouchableOpacity>
 
       <Animated.View style={[s.profileHeader, { opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}>
@@ -180,14 +184,14 @@ export default function AthleteProfileScreen() {
         )}
         {athlete?.notes && (
           <View style={s.notesCard}>
-            <Text style={s.notesLabel}>📝 Note atleta</Text>
+            <Text style={s.notesLabel}>Note atleta</Text>
             <Text style={s.notesText}>{athlete.notes}</Text>
           </View>
         )}
 
         {(athlete?.goal || athlete?.experience_level || athlete?.days_per_week || athlete?.about_me) && (
           <View style={s.goalsCard}>
-            <Text style={s.goalsTitle}>🎯 Obiettivi e contesto</Text>
+            <Text style={s.goalsTitle}>Obiettivi e contesto</Text>
             <View style={s.goalsBadgeRow}>
               {athlete.goal && (
                 <View style={s.goalsBadge}>
@@ -201,7 +205,7 @@ export default function AthleteProfileScreen() {
               )}
               {athlete.days_per_week && (
                 <View style={s.goalsBadge}>
-                  <Text style={s.goalsBadgeText}>📅 {athlete.days_per_week}g/settimana</Text>
+                  <Text style={s.goalsBadgeText}>{athlete.days_per_week}g/settimana</Text>
                 </View>
               )}
             </View>
@@ -227,7 +231,7 @@ export default function AthleteProfileScreen() {
               <MacroBox label="Carbo" value={`${nutrition.carbs_g}`} unit="g" color="#2196F3" colors={colors} />
               <MacroBox label="Grassi" value={`${nutrition.fat_g}`} unit="g" color="#FF9800" colors={colors} />
             </View>
-            {nutrition.notes && <Text style={s.nutritionNotes}>📝 {nutrition.notes}</Text>}
+            {nutrition.notes && <Text style={s.nutritionNotes}>{nutrition.notes}</Text>}
           </View>
         ) : (
           <Text style={s.emptyText}>Nessun piano alimentare ancora.</Text>
@@ -259,13 +263,16 @@ export default function AthleteProfileScreen() {
                   <Text style={s.statusText}>{plan.is_active ? 'Attiva' : 'Inattiva'}</Text>
                 </View>
                 <TouchableOpacity style={s.trashButton} onPress={() => handleDeletePlan(plan.id, plan.name)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={s.trashIcon}>🗑️</Text>
+                  <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
               <Text style={s.planName}>{plan.name}</Text>
               {plan.description && <Text style={s.planDesc}>{plan.description}</Text>}
               <View style={s.planBottom}>
-                <Text style={s.planDate}>📅 {new Date(plan.created_at).toLocaleDateString('it-IT')}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
+                <Text style={s.planDate}>{new Date(plan.created_at).toLocaleDateString('it-IT')}</Text>
+              </View>
                 <Text style={s.chevron}>›</Text>
               </View>
             </ScalePressable>
@@ -274,11 +281,17 @@ export default function AthleteProfileScreen() {
       </View>
 
       <ScalePressable style={s.progressButton} onPress={() => router.push({ pathname: '/(trainer)/athlete/progress/[id]', params: { id } })}>
-        <Text style={s.progressButtonText}>📈 Vedi progressi atleta</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Ionicons name="trending-up-outline" size={18} color={colors.accent} />
+          <Text style={s.progressButtonText}>Vedi progressi atleta</Text>
+        </View>
       </ScalePressable>
 
       <ScalePressable style={s.chatButton} onPress={() => router.push({ pathname: '/(trainer)/chat/[id]', params: { id, name: athlete?.full_name ?? '' } })}>
-        <Text style={s.chatButtonText}>💬 Messaggia</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Ionicons name="chatbubble-outline" size={18} color="#fff" />
+          <Text style={s.chatButtonText}>Messaggia</Text>
+        </View>
       </ScalePressable>
 
       <ScalePressable style={s.removeButton} onPress={handleRemoveAthlete}>

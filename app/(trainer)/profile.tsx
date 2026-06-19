@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, ActivityIndicator, Dimensions, Animated,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { PhotoModal } from '@/components/PhotoModal';
 import * as ImagePicker from 'expo-image-picker';
@@ -128,14 +129,15 @@ export default function TrainerProfileScreen() {
     <View style={s.container}>
       {/* Header */}
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>‹ Dashboard</Text>
+        <TouchableOpacity style={{flexDirection:'row',alignItems:'center',gap:4}} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={22} color={colors.accent} />
+          <Text style={s.backText}>Dashboard</Text>
         </TouchableOpacity>
         <View style={s.titleWrap} pointerEvents="none">
           <Text style={s.title}>Il mio profilo</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/(trainer)/settings')}>
-          <Text style={s.gearIcon}>⚙️</Text>
+          <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
@@ -197,7 +199,7 @@ export default function TrainerProfileScreen() {
             <ActivityIndicator color={colors.accent} style={{ marginVertical: 20 }} />
           ) : athletes.length === 0 ? (
             <View style={s.emptyState}>
-              <Text style={s.emptyIcon}>👥</Text>
+              <Ionicons name="people-outline" size={40} color={colors.textMuted} />
               <Text style={s.emptyTitle}>Nessun atleta ancora</Text>
               <Text style={s.emptySub}>Accetta le richieste dal dashboard</Text>
             </View>
@@ -221,7 +223,7 @@ export default function TrainerProfileScreen() {
         <ScrollView style={s.page} contentContainerStyle={s.pageContent} showsVerticalScrollIndicator={false}>
           <Text style={s.sectionLabel}>STRUMENTI</Text>
           <TouchableOpacity style={s.card} onPress={() => router.push('/(trainer)/exercises')} activeOpacity={0.75}>
-            <Text style={s.navIcon}>💪</Text>
+            <Ionicons name="barbell-outline" size={22} color={colors.textSecondary} style={{ marginRight: 14 }} />
             <View style={{ flex: 1 }}>
               <Text style={s.cardName}>I miei esercizi</Text>
               <Text style={s.cardSub}>Gestisci il catalogo esercizi custom</Text>
@@ -241,7 +243,7 @@ export default function TrainerProfileScreen() {
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
   centered: { flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingTop: 60, paddingBottom: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 60, paddingBottom: 16 },
   backText: { color: c.accent, fontSize: 16, fontWeight: '600' },
   titleWrap: { position: 'absolute', left: 0, right: 0 },
   title: { textAlign: 'center', fontSize: 18, fontWeight: '800', color: c.text },

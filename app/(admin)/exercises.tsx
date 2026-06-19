@@ -3,6 +3,10 @@ import {
   View, Text, StyleSheet, FlatList, TextInput,
   TouchableOpacity, ActivityIndicator, Modal, ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
+import { decode } from 'base64-arraybuffer';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../context/ThemeContext';
@@ -16,6 +20,7 @@ type Exercise = {
   equipment: string;
   difficulty: 'principiante' | 'intermedio' | 'avanzato';
   description: string | null;
+  image_url: string | null;
 };
 
 type FormState = {
@@ -46,12 +51,14 @@ export default function AdminExercises() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const fetchExercises = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
       .from('exercise_catalog')
-      .select('id, name, muscle_group, equipment, difficulty, description')
+      .select('id, name, muscle_group, equipment, difficulty, description, image_url')
       .is('trainer_id', null)
       .order('name');
     setExercises((data as Exercise[]) ?? []);
@@ -68,6 +75,7 @@ export default function AdminExercises() {
   const openAdd = () => {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setImageUrl(null);
     setModalVisible(true);
   };
 
@@ -80,7 +88,23 @@ export default function AdminExercises() {
       difficulty: ex.difficulty,
       description: ex.description ?? '',
     });
+    setImageUrl(ex.image_url ?? null);
     setModalVisible(true);
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.8, base64: true });
+    if (result.canceled || !result.assets[0].base64) return;
+    setUploadingImage(true);
+    const asset = result.assets[0];
+    const ext = asset.uri.split('.').pop()?.toLowerCase() ?? 'jpg';
+    const fileName = `global/${Date.now()}.${ext}`;
+    const contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+    const { error } = await supabase.storage.from('exercises').upload(fileName, decode(asset.base64!), { contentType, upsert: true });
+    if (error) { showAlert({ title: 'Errore upload', message: error.message }); setUploadingImage(false); return; }
+    const { data } = supabase.storage.from('exercises').getPublicUrl(fileName);
+    setImageUrl(`${data.publicUrl}?t=${Date.now()}`);
+    setUploadingImage(false);
   };
 
   const handleSave = async () => {
@@ -95,13 +119,16 @@ export default function AdminExercises() {
       equipment: form.equipment.trim() || 'corpo libero',
       difficulty: form.difficulty,
       description: form.description.trim() || null,
+      image_url: imageUrl,
       trainer_id: null,
     };
 
     if (editingId) {
-      await supabase.from('exercise_catalog').update(payload).eq('id', editingId);
+      const { error } = await supabase.from('exercise_catalog').update(payload).eq('id', editingId);
+      if (error) { showAlert({ title: 'Errore', message: error.message }); setSaving(false); return; }
     } else {
-      await supabase.from('exercise_catalog').insert(payload);
+      const { error } = await supabase.from('exercise_catalog').insert(payload);
+      if (error) { showAlert({ title: 'Errore', message: error.message }); setSaving(false); return; }
     }
     setSaving(false);
     setModalVisible(false);
@@ -132,6 +159,10 @@ export default function AdminExercises() {
 
   const renderItem = ({ item }: { item: Exercise }) => (
     <View style={s.row}>
+      {item.image_url
+        ? <Image source={{ uri: item.image_url }} style={s.rowThumb} contentFit="cover" />
+        : <View style={[s.rowThumb, s.rowThumbPlaceholder]}><Ionicons name="barbell-outline" size={20} color={colors.textMuted} /></View>
+      }
       <View style={s.rowInfo}>
         <Text style={s.rowName}>{item.name}</Text>
         <View style={s.rowMeta}>
@@ -145,7 +176,7 @@ export default function AdminExercises() {
           <Text style={s.editBtnText}>✎</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.deleteBtn} onPress={() => handleDelete(item)} activeOpacity={0.7}>
-          <Text style={s.deleteBtnText}>✕</Text>
+          <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
     </View>
@@ -155,7 +186,7 @@ export default function AdminExercises() {
     <View style={s.container}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Text style={s.backText}>‹</Text>
+          <Ionicons name="chevron-back" size={22} color={colors.accent} />
         </TouchableOpacity>
         <Text style={s.title}>Esercizi globali</Text>
         <TouchableOpacity style={s.addBtn} onPress={openAdd}>
@@ -232,6 +263,25 @@ export default function AdminExercises() {
               numberOfLines={4}
               textAlignVertical="top"
             />
+
+            <Text style={s.fieldLabel}>Immagine copertina</Text>
+            <TouchableOpacity style={s.imagePicker} onPress={pickImage} disabled={uploadingImage}>
+              {uploadingImage ? (
+                <ActivityIndicator color={colors.accent} />
+              ) : imageUrl ? (
+                <Image source={{ uri: imageUrl }} style={s.imagePreview} contentFit="cover" />
+              ) : (
+                <View style={s.imagePlaceholder}>
+                  <Text style={{ fontSize: 28 }}>🖼</Text>
+                  <Text style={s.imagePlaceholderText}>Tocca per aggiungere</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            {imageUrl && (
+              <TouchableOpacity onPress={() => setImageUrl(null)} style={s.removeImageBtn}>
+                <Text style={s.removeImageText}>Rimuovi immagine</Text>
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
@@ -263,7 +313,9 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   list: { paddingHorizontal: 16, paddingBottom: 40 },
   separator: { height: 1, backgroundColor: c.border },
   empty: { color: c.textSecondary, textAlign: 'center', marginTop: 40, fontSize: 15 },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 },
+  rowThumb: { width: 52, height: 52, borderRadius: 10, overflow: 'hidden' },
+  rowThumbPlaceholder: { backgroundColor: '#E8533A22', alignItems: 'center', justifyContent: 'center' },
   rowInfo: { flex: 1, gap: 3 },
   rowName: { fontSize: 15, fontWeight: '700', color: c.text },
   rowMeta: { flexDirection: 'row', gap: 8, alignItems: 'center' },
@@ -298,4 +350,10 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
     alignItems: 'center',
   },
   diffChipText: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
+  imagePicker: { height: 150, borderRadius: 12, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: c.surface },
+  imagePreview: { width: '100%', height: '100%' },
+  imagePlaceholder: { alignItems: 'center', gap: 8 },
+  imagePlaceholderText: { color: c.textMuted, fontSize: 13 },
+  removeImageBtn: { marginTop: 8, alignItems: 'center' },
+  removeImageText: { color: '#ef4444', fontSize: 13, fontWeight: '600' },
 });

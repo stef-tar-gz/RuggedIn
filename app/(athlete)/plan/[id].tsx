@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView,
   ActivityIndicator, TouchableOpacity, Animated
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
@@ -76,7 +77,7 @@ export default function AthletePlanScreen() {
 
     const { data: exData } = await supabase
       .from('exercises')
-      .select('id, name, muscle_group, sets, reps, rest_seconds, notes, order_index, day_index, has_dropset, dropset_percentage, dropset_sets, has_backoff, backoff_percentage, backoff_sets, has_stripping, stripping_steps, stripping_percentage, stripping_reps_increase, catalog_exercise_id, exercise_catalog(name, muscle_group, equipment, difficulty, description, video_url)')
+      .select('id, name, muscle_group, sets, reps, rest_seconds, notes, order_index, day_index, has_dropset, dropset_percentage, dropset_sets, has_backoff, backoff_percentage, backoff_sets, has_stripping, stripping_steps, stripping_percentage, stripping_reps_increase, catalog_exercise_id, exercise_catalog(name, muscle_group, equipment, difficulty, description, video_url, image_url)')
       .eq('workout_plan_id', id)
       .eq('is_deleted', false)
       .order('order_index');
@@ -99,7 +100,10 @@ export default function AthletePlanScreen() {
 
       <Animated.View style={{ opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
         <TouchableOpacity style={s.backButton} onPress={() => router.back()}>
-          <Text style={s.backText}>‹ Le mie schede</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="chevron-back" size={22} color={colors.accent} />
+            <Text style={s.backText}>Le mie schede</Text>
+          </View>
         </TouchableOpacity>
 
         <View style={s.planHeader}>
@@ -113,7 +117,10 @@ export default function AthletePlanScreen() {
             </View>
           </View>
           {plan?.description && <Text style={s.planDesc}>{plan.description}</Text>}
-          <Text style={s.planDate}>📅 Creata il {new Date(plan?.created_at ?? '').toLocaleDateString('it-IT')}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <Ionicons name="calendar-outline" size={13} color={colors.textMuted} />
+            <Text style={s.planDate}>Creata il {new Date(plan?.created_at ?? '').toLocaleDateString('it-IT')}</Text>
+          </View>
         </View>
       </Animated.View>
 
@@ -144,11 +151,10 @@ export default function AthletePlanScreen() {
             <View key={day}>
               {multiDay && <Text style={s.sectionTitle}>Giorno {day}</Text>}
               {!multiDay && <Text style={s.sectionTitle}>Esercizi</Text>}
-              {dayExercises.map((exercise, index) => (
+              {dayExercises.map((exercise, index) => {
+                const cat = (exercise as any).exercise_catalog;
+                return (
                 <View key={exercise.id} style={s.exerciseCard}>
-                  <View style={s.exerciseLeft}>
-                    <Text style={s.exerciseIndex}>{index + 1}</Text>
-                  </View>
                   <View style={s.exerciseBody}>
                     <View style={s.exerciseNameRow}>
                       <Text style={s.exerciseName}>{exercise.name}</Text>
@@ -156,11 +162,10 @@ export default function AthletePlanScreen() {
                         <TouchableOpacity
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                           onPress={() => {
-                            const cat = (exercise as any).exercise_catalog;
-                            if (cat) setInfoExercise({ name: exercise.name, muscle_group: cat.muscle_group, equipment: cat.equipment, difficulty: cat.difficulty, description: cat.description, video_url: cat.video_url });
+                            if (cat) setInfoExercise({ name: exercise.name, muscle_group: cat.muscle_group, equipment: cat.equipment, difficulty: cat.difficulty, description: cat.description, video_url: cat.video_url, image_url: cat.image_url });
                           }}
                         >
-                          <Text style={s.infoBtn}>ℹ️</Text>
+                          <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
                         </TouchableOpacity>
                       )}
                     </View>
@@ -175,35 +180,49 @@ export default function AthletePlanScreen() {
                         {exercise.has_dropset && (
                           <View style={[s.techniquePill, { backgroundColor: colors.accentBg, borderColor: colors.accentBorder }]}>
                             <Text style={[s.techniquePillText, { color: colors.accent }]}>
-                              🔴 DS ×{exercise.dropset_sets ?? 1}  -{exercise.dropset_percentage}%
+                              DS ×{exercise.dropset_sets ?? 1}  -{exercise.dropset_percentage}%
                             </Text>
                           </View>
                         )}
                         {exercise.has_backoff && (
                           <View style={[s.techniquePill, { backgroundColor: '#2196F318', borderColor: '#2196F344' }]}>
                             <Text style={[s.techniquePillText, { color: '#2196F3' }]}>
-                              🔵 BO ×{exercise.backoff_sets ?? 1}  -{exercise.backoff_percentage}%
+                              BO ×{exercise.backoff_sets ?? 1}  -{exercise.backoff_percentage}%
                             </Text>
                           </View>
                         )}
                         {exercise.has_stripping && (
                           <View style={[s.techniquePill, { backgroundColor: '#9C27B018', borderColor: '#9C27B044' }]}>
                             <Text style={[s.techniquePillText, { color: '#9C27B0' }]}>
-                              🟣 Strip {exercise.stripping_steps}× -{exercise.stripping_percentage}%{(exercise.stripping_reps_increase ?? 0) > 0 ? `  +${exercise.stripping_reps_increase}r` : ''}
+                              Strip {exercise.stripping_steps}× -{exercise.stripping_percentage}%{(exercise.stripping_reps_increase ?? 0) > 0 ? `  +${exercise.stripping_reps_increase}r` : ''}
                             </Text>
                           </View>
                         )}
                       </View>
                     )}
-                    {exercise.notes && <Text style={s.exerciseNotes}>📝 {exercise.notes}</Text>}
+                    {exercise.notes && (
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 8 }}>
+                        <Ionicons name="document-text-outline" size={14} color={colors.textMuted} style={{ marginTop: 1 }} />
+                        <Text style={s.exerciseNotes}>{exercise.notes}</Text>
+                      </View>
+                    )}
+                    <View style={s.exerciseFooter}>
+                      <View style={s.exerciseIndexBadge}>
+                        <Text style={s.exerciseIndex}>{index + 1}</Text>
+                      </View>
+                    </View>
                   </View>
                 </View>
-              ))}
+                );
+              })}
               <TouchableOpacity
                 style={s.startButton}
                 onPress={() => router.push({ pathname: '/(athlete)/session', params: { planId: plan?.id, dayIndex: String(day) } })}
               >
-                <Text style={s.startButtonText}>▶ {multiDay ? `Inizia Giorno ${day}` : 'Inizia sessione'}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="caret-forward" size={14} color="#fff" />
+                  <Text style={s.startButtonText}>{multiDay ? `Inizia Giorno ${day}` : 'Inizia sessione'}</Text>
+                </View>
               </TouchableOpacity>
               {multiDay && <View style={{ height: 24 }} />}
             </View>
@@ -252,10 +271,11 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   statLabel: { color: c.textMuted, fontSize: 11, marginTop: 4 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: c.textSecondary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },
   exerciseCard: { backgroundColor: c.surface, borderRadius: 12, padding: 16, flexDirection: 'row', marginBottom: 10, borderWidth: 1, borderColor: c.border },
-  exerciseLeft: { width: 32, height: 32, borderRadius: 16, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center', marginRight: 14, marginTop: 2 },
-  exerciseIndex: { color: c.accent, fontSize: 14, fontWeight: '800' },
   exerciseBody: { flex: 1 },
   exerciseNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  exerciseFooter: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 },
+  exerciseIndexBadge: { width: 22, height: 22, borderRadius: 11, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center' },
+  exerciseIndex: { color: '#fff', fontSize: 11, fontWeight: '800' },
   exerciseName: { color: c.text, fontSize: 16, fontWeight: '700', flex: 1 },
   infoBtn: { fontSize: 16, marginLeft: 8 },
   muscleGroup: { color: c.accent, fontSize: 12, marginTop: 2 },

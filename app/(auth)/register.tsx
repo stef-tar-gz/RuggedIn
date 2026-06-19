@@ -4,6 +4,7 @@ import {
   StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
 import { useAlert } from '@/context/AlertContext';
@@ -73,7 +74,7 @@ export default function RegisterScreen() {
               secureTextEntry={!showPassword}
             />
             <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPassword(v => !v)}>
-              <Text style={s.eyeIcon}>{showPassword ? '🙈' : '👁️'}</Text>
+              <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={22} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -84,7 +85,7 @@ export default function RegisterScreen() {
               onPress={() => setRole('trainer')}
               activeOpacity={0.8}
             >
-              <Text style={s.roleIcon}>💪</Text>
+              <Ionicons name="fitness-outline" size={22} color={role === 'trainer' ? colors.accent : colors.textSecondary} />
               <Text style={[s.roleButtonText, role === 'trainer' && s.roleButtonTextActive]}>Personal Trainer</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -92,7 +93,7 @@ export default function RegisterScreen() {
               onPress={() => setRole('athlete')}
               activeOpacity={0.8}
             >
-              <Text style={s.roleIcon}>🏋️</Text>
+              <Ionicons name="barbell-outline" size={22} color={role === 'athlete' ? colors.accent : colors.textSecondary} />
               <Text style={[s.roleButtonText, role === 'athlete' && s.roleButtonTextActive]}>Atleta</Text>
             </TouchableOpacity>
           </View>

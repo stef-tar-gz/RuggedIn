@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../context/ThemeContext';
@@ -40,8 +41,9 @@ export default function AdminSettings() {
   return (
     <ScrollView style={s.container} contentContainerStyle={s.content}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>‹ Dashboard</Text>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+          <Ionicons name="chevron-back" size={22} color={colors.accent} />
+          <Text style={s.backText}>Dashboard</Text>
         </TouchableOpacity>
         <View style={{ flex: 1 }} pointerEvents="none">
           <Text style={s.title}>Impostazioni</Text>
@@ -53,7 +55,7 @@ export default function AdminSettings() {
       <Text style={s.groupLabel}>Aspetto</Text>
       <View style={s.group}>
         <TouchableOpacity style={s.row} onPress={toggleTheme} activeOpacity={0.7}>
-          <Text style={s.rowIcon}>{isDark ? '🌙' : '☀️'}</Text>
+          <View style={s.rowIconWrap}><Ionicons name={isDark ? 'moon-outline' : 'sunny-outline'} size={22} color={colors.textSecondary} /></View>
           <View style={s.rowBody}>
             <Text style={s.rowLabel}>Tema</Text>
             <Text style={s.rowSub}>{isDark ? 'Scuro' : 'Chiaro'}</Text>
@@ -66,7 +68,7 @@ export default function AdminSettings() {
       <Text style={s.groupLabel}>Account</Text>
       <View style={s.group}>
         <View style={s.row}>
-          <Text style={s.rowIcon}>👤</Text>
+          <View style={s.rowIconWrap}><Ionicons name="person-outline" size={22} color={colors.textSecondary} /></View>
           <View style={s.rowBody}>
             <Text style={s.rowLabel}>{profile?.full_name}</Text>
             <Text style={s.rowSub}>Amministratore</Text>
@@ -74,7 +76,7 @@ export default function AdminSettings() {
         </View>
         <View style={s.separator} />
         <TouchableOpacity style={s.row} activeOpacity={0.7} onPress={handleChangePassword}>
-          <Text style={s.rowIcon}>🔑</Text>
+          <View style={s.rowIconWrap}><Ionicons name="key-outline" size={22} color={colors.textSecondary} /></View>
           <View style={s.rowBody}>
             <Text style={s.rowLabel}>Cambia password</Text>
             <Text style={s.rowSub}>Ricevi un link via email</Text>
@@ -83,7 +85,7 @@ export default function AdminSettings() {
         </TouchableOpacity>
         <View style={s.separator} />
         <TouchableOpacity style={s.row} activeOpacity={0.7} onPress={handleLogout}>
-          <Text style={s.rowIcon}>🚪</Text>
+          <View style={s.rowIconWrap}><Ionicons name="log-out-outline" size={22} color="#ef4444" /></View>
           <View style={s.rowBody}>
             <Text style={[s.rowLabel, { color: '#ef4444' }]}>Logout</Text>
           </View>
@@ -94,7 +96,7 @@ export default function AdminSettings() {
       <Text style={s.groupLabel}>Info</Text>
       <View style={s.group}>
         <View style={s.row}>
-          <Text style={s.rowIcon}>📱</Text>
+          <View style={s.rowIconWrap}><Ionicons name="phone-portrait-outline" size={22} color={colors.textSecondary} /></View>
           <View style={s.rowBody}>
             <Text style={s.rowLabel}>Versione app</Text>
             <Text style={s.rowSub}>{version}</Text>
@@ -102,7 +104,7 @@ export default function AdminSettings() {
         </View>
         <View style={s.separator} />
         <View style={s.row}>
-          <Text style={s.rowIcon}>🔧</Text>
+          <View style={s.rowIconWrap}><Ionicons name="construct-outline" size={22} color={colors.textSecondary} /></View>
           <View style={s.rowBody}>
             <Text style={s.rowLabel}>Ambiente</Text>
             <Text style={s.rowSub}>Supabase · ruggedin</Text>
@@ -117,13 +119,14 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   container: { flex: 1, backgroundColor: c.bg },
   content: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 48 },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 32 },
-  backText: { color: c.accent, fontSize: 16, width: 80 },
+  backBtn: { flexDirection: 'row', alignItems: 'center', width: 80 },
+  backText: { color: c.accent, fontSize: 16 },
   title: { flex: 1, textAlign: 'center', fontSize: 20, fontWeight: '800', color: c.text },
   groupLabel: { fontSize: 11, fontWeight: '700', color: c.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, marginLeft: 4 },
   group: { backgroundColor: c.surface, borderRadius: 14, borderWidth: 1, borderColor: c.border, marginBottom: 28, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
   separator: { height: 1, backgroundColor: c.border, marginHorizontal: 16 },
-  rowIcon: { fontSize: 20, width: 28, textAlign: 'center' },
+  rowIconWrap: { width: 28, alignItems: 'center', justifyContent: 'center' },
   rowBody: { flex: 1 },
   rowLabel: { fontSize: 15, fontWeight: '600', color: c.text },
   rowSub: { fontSize: 12, color: c.textMuted, marginTop: 2 },

@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, FlatList, TextInput,
   TouchableOpacity, ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
@@ -132,9 +133,12 @@ export default function FindTrainerScreen() {
           {isSending ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={[s.requestBtnText, isDisabled && s.requestBtnTextSent, isLinked && s.requestBtnTextLinked]}>
-              {isLinked ? '✓ Associato' : isSent ? '✓ Inviata' : 'Richiedi'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              {(isLinked || isSent) && <Ionicons name="checkmark" size={14} color={isLinked ? colors.accent : colors.textMuted} />}
+              <Text style={[s.requestBtnText, isDisabled && s.requestBtnTextSent, isLinked && s.requestBtnTextLinked]}>
+                {isLinked ? 'Associato' : isSent ? 'Inviata' : 'Richiedi'}
+              </Text>
+            </View>
           )}
         </TouchableOpacity>
       </TouchableOpacity>
@@ -145,14 +149,14 @@ export default function FindTrainerScreen() {
     <View style={s.container}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={s.backText}>‹</Text>
+          <Ionicons name="chevron-back" size={22} color={colors.accent} />
         </TouchableOpacity>
         <Text style={s.title}>Trova un Trainer</Text>
         <View style={{ width: 32 }} />
       </View>
 
       <View style={s.searchBar}>
-        <Text style={s.searchIcon}>🔍</Text>
+        <Ionicons name="search-outline" size={16} color={colors.textMuted} style={{ marginRight: 8 }} />
         <TextInput
           style={s.searchInput}
           value={search}
@@ -163,7 +167,7 @@ export default function FindTrainerScreen() {
         />
         {search.length > 0 && (
           <TouchableOpacity onPress={() => setSearch('')}>
-            <Text style={s.clearBtn}>✕</Text>
+            <Ionicons name="close" size={18} color={colors.textMuted} />
           </TouchableOpacity>
         )}
       </View>
@@ -182,7 +186,7 @@ export default function FindTrainerScreen() {
           columnWrapperStyle={s.columnWrapper}
           ListEmptyComponent={
             <View style={s.centered}>
-              <Text style={s.emptyIcon}>🔍</Text>
+              <Ionicons name="search-outline" size={32} color={colors.textMuted} style={{ marginBottom: 8 }} />
               <Text style={s.emptyText}>Nessun trainer trovato</Text>
             </View>
           }

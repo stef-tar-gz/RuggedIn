@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView,
   ActivityIndicator, TouchableOpacity, Platform, Dimensions, Animated
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
@@ -145,8 +146,9 @@ export default function ProgressScreen() {
 
       <Animated.View style={{ opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={s.backText}>‹ Schede</Text>
+          <TouchableOpacity onPress={() => router.back()} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <Ionicons name="chevron-back" size={22} color={colors.accent} />
+            <Text style={s.backText}>Schede</Text>
           </TouchableOpacity>
           <View style={s.titleWrap} pointerEvents="none"><Text style={s.title}>I miei progressi</Text></View>
         </View>
@@ -281,7 +283,10 @@ export default function ProgressScreen() {
 
                   {logs.length === 1 ? (
                     <View style={s.singleSessionCard}>
-                      <Text style={s.singleSessionDate}>📅 {formatDate(logs[0].date)}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <Ionicons name="calendar-outline" size={13} color={colors.textMuted} />
+                        <Text style={s.singleSessionDate}>{formatDate(logs[0].date)}</Text>
+                      </View>
                       <Text style={s.singleSessionWeight}>{logs[0].maxWeight} kg</Text>
                       <Text style={s.singleSessionLabel}>Prima sessione registrata</Text>
                     </View>
@@ -313,9 +318,12 @@ export default function ProgressScreen() {
                 {logs.slice().reverse().map((group) => (
                   <View key={group.date} style={s.logGroup}>
                     <View style={s.logDateRow}>
-                      <Text style={s.logDate}>📅 {formatDate(group.date)}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} />
+                        <Text style={s.logDate}>{formatDate(group.date)}</Text>
+                      </View>
                       <TouchableOpacity onPress={() => handleDeleteSession(group.date)}>
-                        <Text style={s.trashIcon}>🗑️</Text>
+                        <Ionicons name="trash-outline" size={16} color={colors.textMuted} />
                       </TouchableOpacity>
                     </View>
                     <View style={s.logCard}>
