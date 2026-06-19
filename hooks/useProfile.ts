@@ -7,6 +7,18 @@ export type Profile = {
   full_name: string;
   role: 'trainer' | 'athlete';
   avatar_url: string | null;
+  is_admin: boolean;
+  is_banned: boolean;
+  last_seen: string | null;
+  goal: string | null;
+  bio: string | null;
+  notes: string | null;
+  about_me: string | null;
+  height_cm: number | null;
+  weight_kg: number | null;
+  experience_level: string | null;
+  days_per_week: number | null;
+  instagram_handle: string | null;
 };
 
 export function useProfile() {

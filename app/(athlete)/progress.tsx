@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  ActivityIndicator, TouchableOpacity, Platform, Dimensions, Animated
+  ActivityIndicator, TouchableOpacity, Platform, Dimensions, Animated, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -12,7 +12,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useAlert } from '@/context/AlertContext';
 import {
   VictoryLine, VictoryChart, VictoryAxis,
-  VictoryScatter, VictoryTheme
+  VictoryScatter,
 } from 'victory-native';
 
 type ExerciseLog = {
@@ -38,6 +38,7 @@ export default function ProgressScreen() {
   const { showAlert } = useAlert();
 
   const [exercises, setExercises] = useState<string[]>([]);
+  const [exerciseSearch, setExerciseSearch] = useState('');
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
   const [logs, setLogs] = useState<GroupedLog[]>([]);
   const [dateFrom, setDateFrom] = useState<Date | null>(null);
@@ -228,30 +229,57 @@ export default function ProgressScreen() {
         {exercises.length === 0 ? (
           <View style={s.emptyCard}><Text style={s.emptyText}>Nessuna sessione registrata ancora.</Text></View>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={s.exerciseChips}>
-              {exercises.map((name) => (
-                <TouchableOpacity
-                  key={name}
-                  style={[s.chip, selectedExercise === name && s.chipActive]}
-                  onPress={() => handleSelectExercise(name)}
-                >
-                  <Text style={[s.chipText, selectedExercise === name && s.chipTextActive]}>{name}</Text>
+          <>
+            <View style={s.searchBox}>
+              <Ionicons name="search-outline" size={16} color={colors.textMuted} />
+              <TextInput
+                style={s.searchInput}
+                value={exerciseSearch}
+                onChangeText={setExerciseSearch}
+                placeholder="Cerca esercizio…"
+                placeholderTextColor={colors.textMuted}
+              />
+              {exerciseSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setExerciseSearch('')}>
+                  <Ionicons name="close-circle" size={16} color={colors.textMuted} />
                 </TouchableOpacity>
-              ))}
+              )}
             </View>
-          </ScrollView>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={s.exerciseChips}>
+                {exercises
+                  .filter(name => name.toLowerCase().includes(exerciseSearch.toLowerCase()))
+                  .map((name) => (
+                    <TouchableOpacity
+                      key={name}
+                      style={[s.chip, selectedExercise === name && s.chipActive]}
+                      onPress={() => handleSelectExercise(name)}
+                    >
+                      <Text style={[s.chipText, selectedExercise === name && s.chipTextActive]}>{name}</Text>
+                    </TouchableOpacity>
+                  ))}
+              </View>
+            </ScrollView>
+          </>
         )}
       </View>
       </Animated.View>
 
       <Animated.View style={{ opacity: resultsAnim, transform: [{ translateY: resultsAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
-      {selectedExercise && (
+      {!selectedExercise ? (
+        <View style={[s.emptyCard, { alignItems: 'center', gap: 8, paddingVertical: 32 }]}>
+          <Ionicons name="stats-chart-outline" size={32} color={colors.textMuted} />
+          <Text style={[s.emptyText, { textAlign: 'center' }]}>Seleziona un esercizio{'\n'}per vedere i tuoi progressi</Text>
+        </View>
+      ) : (
         <>
           {searching ? (
             <ActivityIndicator color={colors.accent} style={{ marginTop: 16 }} />
           ) : logs.length === 0 ? (
-            <View style={s.emptyCard}><Text style={s.emptyText}>Nessun log nel periodo selezionato.</Text></View>
+            <View style={[s.emptyCard, { alignItems: 'center', gap: 8, paddingVertical: 28 }]}>
+              <Ionicons name="calendar-outline" size={28} color={colors.textMuted} />
+              <Text style={[s.emptyText, { textAlign: 'center' }]}>Nessun log per "{selectedExercise}"{'\n'}nel periodo selezionato.</Text>
+            </View>
           ) : (
             <>
               <View style={s.section}>
@@ -295,19 +323,34 @@ export default function ProgressScreen() {
                       width={SCREEN_WIDTH - 80}
                       height={200}
                       padding={{ top: 16, bottom: 40, left: 48, right: 24 }}
-                      theme={VictoryTheme.material}
                     >
                       <VictoryAxis
                         tickValues={chartData.map(d => d.x)}
                         tickFormat={(t) => { const log = logs[t - 1]; return log ? formatShortDate(log.date) : ''; }}
-                        style={{ axis: { stroke: colors.border }, tickLabels: { fill: colors.textMuted, fontSize: 10, fontFamily: 'System' }, grid: { stroke: 'transparent' } }}
+                        style={{
+                          axis: { stroke: colors.border },
+                          tickLabels: { fill: colors.textMuted, fontSize: 10, fontFamily: 'System' },
+                          grid: { stroke: 'transparent' },
+                        }}
                       />
                       <VictoryAxis
                         dependentAxis
-                        style={{ axis: { stroke: colors.border }, tickLabels: { fill: colors.textMuted, fontSize: 10, fontFamily: 'System' }, grid: { stroke: colors.border, strokeDasharray: '4' } }}
+                        style={{
+                          axis: { stroke: colors.border },
+                          tickLabels: { fill: colors.textMuted, fontSize: 10, fontFamily: 'System' },
+                          grid: { stroke: colors.border, strokeDasharray: '4', strokeOpacity: 0.5 },
+                        }}
                       />
-                      <VictoryLine data={chartData} style={{ data: { stroke: colors.accent, strokeWidth: 2.5 } }} interpolation="monotoneX" />
-                      <VictoryScatter data={chartData} size={5} style={{ data: { fill: colors.accent, stroke: colors.bg, strokeWidth: 2 } }} />
+                      <VictoryLine
+                        data={chartData}
+                        style={{ data: { stroke: colors.accent, strokeWidth: 2.5 } }}
+                        interpolation="monotoneX"
+                      />
+                      <VictoryScatter
+                        data={chartData}
+                        size={5}
+                        style={{ data: { fill: colors.accent, stroke: colors.surface, strokeWidth: 2 } }}
+                      />
                     </VictoryChart>
                   )}
                 </View>
@@ -380,6 +423,12 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   pickerDoneText: { color: c.accent, fontSize: 15, fontWeight: '700' },
   filterButton: { backgroundColor: c.accent, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 12 },
   filterButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  searchBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: c.surface, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+    borderWidth: 1, borderColor: c.border, marginBottom: 10,
+  },
+  searchInput: { flex: 1, color: c.text, fontSize: 14 },
   exerciseChips: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
   chip: { backgroundColor: c.surface, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: c.border },
   chipActive: { backgroundColor: c.accentBg, borderColor: c.accent },

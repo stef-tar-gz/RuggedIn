@@ -5,11 +5,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ScalePressable } from '@/components/ScalePressable';
-import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../hooks/useProfile';
 import { useTheme } from '@/context/ThemeContext';
+import { Skeleton } from '@/components/Skeleton';
 
 type WorkoutPlan = {
   id: string;
@@ -20,291 +20,220 @@ type WorkoutPlan = {
   exercise_count: number;
 };
 
-type TrainerInfo = {
-  id: string;
-  full_name: string;
-  avatar_url: string | null;
-};
-
 type NextDay = {
   day_index: number;
-  exercises: string[];
-};
-
-const DAYS_IT = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
-const MONTHS_IT = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-
-const GOAL_LABELS: Record<string, string> = {
-  weight_loss: 'Dimagrimento',
-  muscle_gain: 'Massa muscolare',
-  strength: 'Forza',
-  endurance: 'Resistenza',
-  wellness: 'Benessere',
+  exercises: { name: string; muscle_group: string | null }[];
 };
 
 export default function PlansScreen() {
   const { profile, refetch } = useProfile();
   const { colors } = useTheme();
   const [plans, setPlans] = useState<WorkoutPlan[]>([]);
-  const [trainer, setTrainer] = useState<TrainerInfo | null>(null);
   const [nextDay, setNextDay] = useState<NextDay | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const s = makeStyles(colors);
-  const headerAnim = useRef(new Animated.Value(0)).current;
-  const mainRowAnim = useRef(new Animated.Value(0)).current;
-  const progressBtnAnim = useRef(new Animated.Value(0)).current;
-  const otherPlansAnim = useRef(new Animated.Value(0)).current;
 
-  const now = new Date();
-  const dateLabel = `${DAYS_IT[now.getDay()]} ${now.getDate()} ${MONTHS_IT[now.getMonth()]}`;
-
-  useFocusEffect(useCallback(() => {
-    refetch();
-    headerAnim.setValue(0);
-    mainRowAnim.setValue(0);
-    progressBtnAnim.setValue(0);
-    otherPlansAnim.setValue(0);
-  }, []));
-
-  useEffect(() => {
-    if (profile) fetchData();
-  }, [profile]);
-
-  useEffect(() => {
-    if (!loading) {
-      Animated.stagger(120, [
-        Animated.timing(headerAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.timing(mainRowAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.timing(progressBtnAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.timing(otherPlansAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [loading]);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fetchDataRef = useRef<() => Promise<void>>();
 
   const fetchData = async () => {
-    const [plansRes, trainerRelRes] = await Promise.all([
+    if (!profile) return;
+
+    const [plansRes] = await Promise.all([
       supabase
         .from('workout_plans')
         .select('id, name, description, is_active, created_at, exercises(id)')
-        .eq('athlete_id', profile!.id)
+        .eq('athlete_id', profile.id)
         .order('created_at', { ascending: false }),
-      supabase
-        .from('trainer_athlete')
-        .select('trainer_id')
-        .eq('athlete_id', profile!.id)
-        .maybeSingle(),
     ]);
 
-    setPlans((plansRes.data || []).map((p: any) => ({
+    const rawPlans = plansRes.data || [];
+    setPlans(rawPlans.map((p: any) => ({
       id: p.id, name: p.name, description: p.description,
       is_active: p.is_active, created_at: p.created_at,
       exercise_count: p.exercises?.length ?? 0,
     })));
 
-    if (trainerRelRes.data?.trainer_id) {
-      const { data: tp } = await supabase
-        .from('profiles').select('id, full_name, avatar_url')
-        .eq('id', trainerRelRes.data.trainer_id).single();
-      setTrainer(tp ?? null);
-    } else {
-      setTrainer(null);
-    }
-
-    // Prossimo giorno: cerca esercizi della scheda attiva per day_index
-    const activePlanData = (plansRes.data || []).find((p: any) => p.is_active);
+    // Prossimo giorno della scheda attiva
+    const activePlanData = rawPlans.find((p: any) => p.is_active);
     if (activePlanData) {
       const { data: exData } = await supabase
         .from('exercises')
-        .select('name, day_index')
+        .select('name, day_index, muscle_group')
         .eq('workout_plan_id', activePlanData.id)
         .eq('is_deleted', false)
         .order('day_index')
         .order('order_index');
 
       if (exData && exData.length > 0) {
-        const days = [...new Set(exData.map((e: any) => e.day_index))].sort((a: number, b: number) => a - b);
-        const totalDays = days.length;
+        const days = [...new Set(exData.map((e: any) => e.day_index as number))].sort((a, b) => a - b);
 
-        if (totalDays > 1) {
+        if (days.length > 1) {
           const { data: lastLog } = await supabase
             .from('workout_logs')
-            .select('day_index, log_date')
-            .eq('athlete_id', profile!.id)
+            .select('day_index')
+            .eq('athlete_id', profile.id)
             .eq('workout_plan_id', activePlanData.id)
             .order('log_date', { ascending: false })
             .limit(1)
             .maybeSingle();
 
-          const lastDayIndex = lastLog?.day_index ?? 0;
-
-          const lastDayPos = days.indexOf(lastDayIndex);
-          const nextDayIndex = lastDayPos === -1 || lastDayPos === totalDays - 1
-            ? days[0] as number
-            : days[lastDayPos + 1] as number;
+          const lastDayPos = days.indexOf(lastLog?.day_index ?? -1);
+          const nextDayIndex = lastDayPos === -1 || lastDayPos === days.length - 1
+            ? days[0]
+            : days[lastDayPos + 1];
 
           setNextDay({
             day_index: nextDayIndex,
-            exercises: exData.filter((e: any) => e.day_index === nextDayIndex).map((e: any) => e.name),
+            exercises: exData
+              .filter((e: any) => e.day_index === nextDayIndex)
+              .map((e: any) => ({ name: e.name, muscle_group: e.muscle_group })),
           });
         } else {
-          setNextDay(null);
+          // Scheda a giorno singolo — mostra sempre quel giorno
+          setNextDay({
+            day_index: days[0],
+            exercises: exData.map((e: any) => ({ name: e.name, muscle_group: e.muscle_group })),
+          });
         }
+      } else {
+        setNextDay(null);
       }
+    } else {
+      setNextDay(null);
     }
 
     setLoading(false);
+    Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
   };
+
+  fetchDataRef.current = fetchData;
+
+  useEffect(() => {
+    if (profile) fetchDataRef.current?.();
+  }, [profile]);
+
+  useFocusEffect(useCallback(() => {
+    refetch();
+    setLoading(true);
+    fadeAnim.setValue(0);
+    fetchDataRef.current?.();
+  }, []));
+
+  if (loading) {
+    return (
+      <View style={[s.container, { padding: 20, paddingTop: 60 }]}>
+        <Skeleton width="40%" height={12} style={{ marginBottom: 10 }} />
+        <Skeleton height={200} borderRadius={20} style={{ marginBottom: 16 }} />
+        <Skeleton width="30%" height={11} style={{ marginBottom: 10 }} />
+        <Skeleton height={72} borderRadius={16} style={{ marginBottom: 10 }} />
+        <Skeleton height={72} borderRadius={16} />
+      </View>
+    );
+  }
 
   const activePlan = plans.find(p => p.is_active) ?? null;
   const otherPlans = plans.filter(p => !p.is_active);
-  const goal = (profile as any)?.goal;
 
-  if (loading) {
-    return <View style={s.centered}><ActivityIndicator color={colors.accent} size="large" /></View>;
-  }
-
-  const trainerDestination = trainer
-    ? { pathname: '/(athlete)/trainer/[id]' as const, params: { id: trainer.id } }
-    : '/(athlete)/find-trainer' as const;
+  // Raggruppa esercizi del prossimo giorno per gruppo muscolare
+  const muscleGroups = nextDay
+    ? [...new Set(nextDay.exercises.map(e => e.muscle_group).filter(Boolean))] as string[]
+    : [];
 
   return (
     <ScrollView style={s.container} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
 
-      {/* ── HEADER ── */}
-      <Animated.View style={{ opacity: headerAnim, transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
+      <Animated.View style={{ opacity: fadeAnim }}>
+
+        {/* ── HEADER ── */}
         <View style={s.header}>
-          <View>
-            <Text style={s.dateLabel}>{dateLabel}</Text>
-            <Text style={s.greeting}>Ciao, {profile?.full_name?.split(' ')[0]}</Text>
-          </View>
-          <ScalePressable onPress={() => router.push('/(athlete)/profile')}>
-            <View style={s.avatarWrap}>
-              {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={s.avatar} contentFit="cover" />
-              ) : (
-                <View style={s.avatarPlaceholder}>
-                  <Text style={s.avatarInitial}>{profile?.full_name?.charAt(0).toUpperCase()}</Text>
-                </View>
-              )}
-            </View>
-          </ScalePressable>
+          <Text style={s.headerLabel}>Le mie schede</Text>
         </View>
-      </Animated.View>
 
-      {/* ── RIGA PRINCIPALE: scheda 3/4 + trainer 1/4 ── */}
-      <Animated.View style={{ opacity: mainRowAnim, transform: [{ translateY: mainRowAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
-        <View style={s.mainRow}>
+        {/* ── SESSIONE OGGI ── */}
+        {activePlan && nextDay ? (
+          <View style={s.sessionCard}>
+            <View style={s.sessionTop}>
+              <View>
+                <Text style={s.sessionEyebrow}>Prossimo allenamento</Text>
+                <Text style={s.sessionTitle}>{activePlan.name}</Text>
+                <Text style={s.sessionDay}>Giorno {nextDay.day_index}</Text>
+              </View>
+              <View style={s.activePill}>
+                <View style={s.activeDot} />
+                <Text style={s.activePillText}>Attiva</Text>
+              </View>
+            </View>
 
-          {/* Scheda attiva — 3/4 */}
-          <View style={s.heroWrap}>
-            {activePlan ? (
-              <ScalePressable style={{ flex: 1 }} onPress={() => router.push({ pathname: '/(athlete)/plan/[id]', params: { id: activePlan.id } })}>
-                <View style={s.heroCard}>
-                  <View style={s.activePill}>
-                    <View style={s.activeDot} />
-                    <Text style={s.activePillText}>Attiva</Text>
+            {/* Gruppi muscolari */}
+            {muscleGroups.length > 0 && (
+              <View style={s.muscleRow}>
+                {muscleGroups.map(m => (
+                  <View key={m} style={s.musclePill}>
+                    <Text style={s.musclePillText}>{m}</Text>
                   </View>
-                  <Text style={s.heroPlanName} numberOfLines={2}>{activePlan.name}</Text>
-                  {activePlan.description ? (
-                    <Text style={s.heroPlanDesc} numberOfLines={2}>{activePlan.description}</Text>
-                  ) : null}
-                  <View style={s.heroFooter}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Ionicons name="barbell-outline" size={13} color={colors.textMuted} />
-                      <Text style={s.heroMeta}>{activePlan.exercise_count}</Text>
-                    </View>
-                    {goal ? <Text style={s.heroMeta}>{GOAL_LABELS[goal]?.split(' ')[0]}</Text> : null}
-                  </View>
-                  <Text style={s.heroLink}>Apri →</Text>
-                </View>
-              </ScalePressable>
-            ) : (
-              <View style={[s.heroCard, s.heroCardEmpty]}>
-                <Ionicons name="document-outline" size={32} color={colors.textMuted} style={{ marginBottom: 8 }} />
-                <Text style={s.heroEmptyText}>Nessuna{'\n'}scheda attiva</Text>
+                ))}
               </View>
             )}
-          </View>
 
-          {/* Trainer — 1/4 */}
-          <ScalePressable style={s.trainerWrap} onPress={() => router.push(trainerDestination)}>
-            <View style={s.trainerCard}>
-              {trainer ? (
-                <>
-                  {trainer.avatar_url ? (
-                    <Image source={{ uri: trainer.avatar_url }} style={s.trainerAvatar} contentFit="cover" />
-                  ) : (
-                    <View style={s.trainerAvatarPlaceholder}>
-                      <Text style={s.trainerInitial}>{trainer.full_name.charAt(0).toUpperCase()}</Text>
-                    </View>
-                  )}
-                  <Text style={s.trainerName} numberOfLines={1}>{trainer.full_name.split(' ')[0]}</Text>
-                  <Text style={s.trainerLabel}>Trainer</Text>
-                </>
-              ) : (
-                <>
-                  <Ionicons name="search-outline" size={26} color={colors.textMuted} />
-                  <Text style={s.trainerLabel}>Trova{'\n'}Trainer</Text>
-                </>
-              )}
-            </View>
-          </ScalePressable>
-
-        </View>
-      </Animated.View>
-
-      {/* ── PROSSIMO ALLENAMENTO ── */}
-      {nextDay && (
-        <Animated.View style={{ opacity: progressBtnAnim, transform: [{ translateY: progressBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
-          <View style={s.nextDayCard}>
-            <View style={s.nextDayHeader}>
-              <Text style={s.nextDayLabel}>PROSSIMO ALLENAMENTO</Text>
-              <Text style={s.nextDayBadge}>Giorno {nextDay.day_index}</Text>
-            </View>
-            <View style={s.nextDayExercises}>
-              {nextDay.exercises.slice(0, 4).map((name, i) => (
-                <View key={i} style={s.nextDayRow}>
-                  <View style={s.nextDayDot} />
-                  <Text style={s.nextDayExName} numberOfLines={1}>{name}</Text>
+            {/* Lista esercizi */}
+            <View style={s.exerciseList}>
+              {nextDay.exercises.slice(0, 5).map((ex, i) => (
+                <View key={i} style={s.exerciseRow}>
+                  <View style={s.exerciseDot} />
+                  <Text style={s.exerciseName} numberOfLines={1}>{ex.name}</Text>
                 </View>
               ))}
-              {nextDay.exercises.length > 4 && (
-                <Text style={s.nextDayMore}>+{nextDay.exercises.length - 4} altri</Text>
+              {nextDay.exercises.length > 5 && (
+                <Text style={s.exerciseMore}>+{nextDay.exercises.length - 5} altri esercizi</Text>
               )}
             </View>
+
+            {/* Bottone sessione */}
             <ScalePressable
-              onPress={() => router.push({ pathname: '/(athlete)/session', params: { planId: activePlan!.id, dayIndex: String(nextDay.day_index) } })}
+              onPress={() => router.push({
+                pathname: '/(athlete)/session',
+                params: { planId: activePlan.id, dayIndex: String(nextDay.day_index) },
+              })}
             >
-              <View style={s.nextDayStartBtn}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="caret-forward" size={14} color="#fff" />
-                  <Text style={s.nextDayStartText}>Avvia</Text>
-                </View>
+              <View style={s.startBtn}>
+                <Ionicons name="caret-forward-circle" size={20} color="#fff" />
+                <Text style={s.startBtnText}>Inizia sessione</Text>
               </View>
             </ScalePressable>
-          </View>
-        </Animated.View>
-      )}
 
-      {/* ── PROGRESSI ── */}
-      <Animated.View style={{ opacity: progressBtnAnim, transform: [{ translateY: progressBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
-        <ScalePressable onPress={() => router.push('/(athlete)/progress')}>
-          <View style={s.progressBtn}>
-            <View style={s.progressBtnLeft}>
-              <Ionicons name="trending-up-outline" size={26} color={colors.accent} />
-              <View>
-                <Text style={s.progressBtnTitle}>I miei progressi</Text>
-                <Text style={s.progressBtnSub}>Grafici, record e storico</Text>
+            {/* Link dettaglio scheda */}
+            <ScalePressable
+              onPress={() => router.push({ pathname: '/(athlete)/plan/[id]', params: { id: activePlan.id } })}
+              style={{ marginTop: 10 }}
+            >
+              <Text style={s.viewPlanLink}>Vedi scheda completa →</Text>
+            </ScalePressable>
+          </View>
+        ) : activePlan ? (
+          // Scheda attiva ma senza giorni configurati
+          <ScalePressable
+            onPress={() => router.push({ pathname: '/(athlete)/plan/[id]', params: { id: activePlan.id } })}
+          >
+            <View style={s.sessionCard}>
+              <View style={s.activePill}>
+                <View style={s.activeDot} />
+                <Text style={s.activePillText}>Attiva</Text>
               </View>
+              <Text style={[s.sessionTitle, { marginTop: 10 }]}>{activePlan.name}</Text>
+              <Text style={s.sessionDay}>{activePlan.exercise_count} esercizi · Apri →</Text>
             </View>
-            <Text style={s.progressBtnChevron}>›</Text>
+          </ScalePressable>
+        ) : (
+          <View style={s.emptyCard}>
+            <Ionicons name="document-outline" size={36} color={colors.textMuted} style={{ marginBottom: 10 }} />
+            <Text style={s.emptyText}>Nessuna scheda attiva</Text>
+            <Text style={s.emptySubtext}>Il tuo trainer la creerà presto.</Text>
           </View>
-        </ScalePressable>
-      </Animated.View>
+        )}
 
-      {/* ── ALTRE SCHEDE ── */}
-      <Animated.View style={{ opacity: otherPlansAnim, transform: [{ translateY: otherPlansAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>
+        {/* ── ALTRE SCHEDE ── */}
         {otherPlans.length > 0 && (
           <>
             <Text style={s.sectionTitle}>Altre schede</Text>
@@ -317,7 +246,7 @@ export default function PlansScreen() {
                 <View style={s.planLeft}>
                   <Text style={s.planName}>{plan.name}</Text>
                   {plan.description && <Text style={s.planDesc} numberOfLines={1}>{plan.description}</Text>}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                     <Ionicons name="barbell-outline" size={12} color={colors.textMuted} />
                     <Text style={s.planMeta}>{plan.exercise_count} esercizi · {new Date(plan.created_at).toLocaleDateString('it-IT')}</Text>
                   </View>
@@ -328,114 +257,78 @@ export default function PlansScreen() {
           </>
         )}
 
-        {plans.length === 0 && (
-          <View style={s.emptyCard}>
-            <Text style={s.emptyText}>Nessuna scheda ancora.</Text>
-            <Text style={s.emptySubtext}>Il tuo trainer la creerà presto.</Text>
+        {plans.length === 0 && !activePlan && (
+          <View style={{ marginTop: 12 }}>
+            <Text style={s.sectionTitle}>Altre schede</Text>
+            <View style={s.emptyCard}>
+              <Text style={s.emptySubtext}>Nessuna scheda disponibile.</Text>
+            </View>
           </View>
         )}
-      </Animated.View>
 
+      </Animated.View>
     </ScrollView>
   );
 }
 
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
-  content: { paddingHorizontal: 20, paddingTop: 64, paddingBottom: 48 },
-  centered: { flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' },
+  content: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 48 },
 
-  // Header
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  dateLabel: { fontSize: 11, color: c.textMuted, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.5 },
-  greeting: { fontSize: 28, fontWeight: '900', color: c.text, marginTop: 2, letterSpacing: -0.5 },
-  avatarWrap: { borderRadius: 26, borderWidth: 2, borderColor: c.accent },
-  avatar: { width: 48, height: 48, borderRadius: 24 },
-  avatarPlaceholder: { width: 48, height: 48, borderRadius: 24, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { color: c.accent, fontSize: 18, fontWeight: '800' },
+  header: { marginBottom: 20 },
+  headerLabel: { fontSize: 24, fontWeight: '900', color: c.text, letterSpacing: -0.5 },
 
-  // Riga principale
-  mainRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  heroWrap: { flex: 3 },
-  heroCard: {
-    flex: 1, backgroundColor: c.surface, borderRadius: 20, padding: 18,
-    borderWidth: 1, borderColor: c.accentBorder, minHeight: 180,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
+  // Card sessione principale
+  sessionCard: {
+    backgroundColor: c.surface, borderRadius: 24, padding: 20, marginBottom: 24,
+    borderWidth: 1, borderColor: c.accentBorder,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 16, elevation: 4,
   },
-  heroCardEmpty: { alignItems: 'center', justifyContent: 'center', borderColor: c.border },
-  activePill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: c.accentBg, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start', marginBottom: 12 },
+  sessionTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
+  sessionEyebrow: { fontSize: 11, fontWeight: '800', color: c.accent, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 4 },
+  sessionTitle: { fontSize: 20, fontWeight: '900', color: c.text, letterSpacing: -0.3 },
+  sessionDay: { fontSize: 13, color: c.textMuted, marginTop: 3 },
+  activePill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: c.accentBg, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
   activeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#4CAF50' },
   activePillText: { color: c.accent, fontSize: 11, fontWeight: '800' },
-  heroPlanName: { fontSize: 17, fontWeight: '900', color: c.text, marginBottom: 6, lineHeight: 22, letterSpacing: -0.3 },
-  heroPlanDesc: { fontSize: 12, color: c.textSecondary, marginBottom: 10, lineHeight: 18 },
-  heroFooter: { flexDirection: 'row', gap: 10, flexWrap: 'wrap', marginBottom: 10 },
-  heroMeta: { fontSize: 12, color: c.textMuted },
-  heroLink: { fontSize: 13, color: c.accent, fontWeight: '800' },
-  heroEmptyIcon: { fontSize: 32, marginBottom: 8 },
-  heroEmptyText: { color: c.textMuted, fontSize: 13, fontWeight: '600', textAlign: 'center', lineHeight: 18 },
 
-  // Trainer
-  trainerWrap: { flex: 1 },
-  trainerCard: {
-    flex: 1, backgroundColor: c.surface, borderRadius: 20, padding: 14,
-    borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center', minHeight: 180, gap: 8,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
-  },
-  trainerAvatar: { width: 48, height: 48, borderRadius: 24 },
-  trainerAvatarPlaceholder: { width: 48, height: 48, borderRadius: 24, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center' },
-  trainerInitial: { color: c.accent, fontSize: 18, fontWeight: '800' },
-  trainerName: { fontSize: 12, fontWeight: '700', color: c.text, textAlign: 'center' },
-  trainerLabel: { fontSize: 10, color: c.textMuted, textAlign: 'center', lineHeight: 14 },
-  trainerEmpty: { fontSize: 26 },
+  muscleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 },
+  musclePill: { backgroundColor: c.bg, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: c.border },
+  musclePillText: { color: c.textSecondary, fontSize: 12, fontWeight: '600' },
 
-  // Prossimo allenamento
-  nextDayCard: {
-    backgroundColor: c.surface, borderRadius: 20, padding: 20, marginBottom: 12,
-    borderWidth: 1, borderColor: c.border,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
-  },
-  nextDayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  nextDayLabel: { fontSize: 11, fontWeight: '800', color: c.textMuted, letterSpacing: 1.5, textTransform: 'uppercase' },
-  nextDayBadge: { backgroundColor: c.accentBg, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, fontSize: 12, fontWeight: '700', color: c.accent },
-  nextDayExercises: { gap: 8 },
-  nextDayRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  nextDayDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: c.accent },
-  nextDayExName: { fontSize: 14, color: c.text, fontWeight: '500', flex: 1 },
-  nextDayMore: { fontSize: 12, color: c.textMuted, marginTop: 4, marginLeft: 16 },
-  nextDayStartBtn: { marginTop: 16, backgroundColor: c.accent, borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center' },
-  nextDayStartText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  exerciseList: { gap: 8, marginBottom: 20 },
+  exerciseRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  exerciseDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: c.accent },
+  exerciseName: { fontSize: 14, color: c.text, fontWeight: '500', flex: 1 },
+  exerciseMore: { fontSize: 12, color: c.textMuted, marginLeft: 16, marginTop: 2 },
 
-  // Progressi
-  progressBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: c.surface, borderRadius: 20, padding: 20, marginBottom: 28,
-    borderWidth: 1, borderColor: c.border,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
+  startBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: c.accent, borderRadius: 14, height: 52,
   },
-  progressBtnLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  progressBtnIcon: { fontSize: 26 },
-  progressBtnTitle: { fontSize: 15, fontWeight: '700', color: c.text },
-  progressBtnSub: { fontSize: 12, color: c.textMuted, marginTop: 2 },
-  progressBtnChevron: { color: c.textMuted, fontSize: 24 },
+  startBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  viewPlanLink: { color: c.textMuted, fontSize: 13, fontWeight: '600', textAlign: 'center' },
+
+  // Sezione
+  sectionTitle: { fontSize: 11, fontWeight: '800', color: c.textMuted, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 12 },
 
   // Altre schede
-  sectionTitle: { fontSize: 11, fontWeight: '800', color: c.textMuted, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 12 },
   planCard: {
-    backgroundColor: c.surface, borderRadius: 20, padding: 20, marginBottom: 10,
+    backgroundColor: c.surface, borderRadius: 18, padding: 18, marginBottom: 10,
     borderWidth: 1, borderColor: c.border, flexDirection: 'row', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
   planLeft: { flex: 1, marginRight: 8 },
-  planName: { color: c.text, fontSize: 15, fontWeight: '700', marginBottom: 4 },
-  planDesc: { color: c.textSecondary, fontSize: 13, marginBottom: 6 },
+  planName: { color: c.text, fontSize: 15, fontWeight: '700', marginBottom: 2 },
+  planDesc: { color: c.textSecondary, fontSize: 13, marginBottom: 4 },
   planMeta: { color: c.textMuted, fontSize: 12 },
   planChevron: { color: c.textMuted, fontSize: 24 },
 
   // Empty
   emptyCard: {
-    backgroundColor: c.surface, borderRadius: 20, padding: 32, alignItems: 'center',
-    borderWidth: 1, borderColor: c.border,
+    backgroundColor: c.surface, borderRadius: 20, padding: 36, alignItems: 'center',
+    borderWidth: 1, borderColor: c.border, marginBottom: 24,
   },
-  emptyText: { color: c.text, fontSize: 17, fontWeight: '700', marginBottom: 6 },
-  emptySubtext: { color: c.textMuted, fontSize: 14 },
+  emptyText: { color: c.text, fontSize: 16, fontWeight: '700', marginBottom: 6 },
+  emptySubtext: { color: c.textMuted, fontSize: 14, textAlign: 'center' },
 });

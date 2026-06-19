@@ -36,21 +36,21 @@ export default function RootLayout() {
           .eq('auth_user_id', session.user.id)
           .single();
         if (fallback?.role === 'trainer') router.replace('/(trainer)/dashboard');
-        else if (fallback?.role === 'athlete') router.replace('/(athlete)/plans');
+        else if (fallback?.role === 'athlete') router.replace('/(athlete)/dashboard');
         return;
       }
 
-      if ((profile as any)?.is_banned) {
+      if (profile?.is_banned) {
         await supabase.auth.signOut();
         return;
       }
 
-      if ((profile as any)?.is_admin) {
+      if (profile?.is_admin) {
         router.replace('/(admin)/dashboard');
       } else if (profile?.role === 'trainer') {
         router.replace('/(trainer)/dashboard');
       } else if (profile?.role === 'athlete') {
-        router.replace('/(athlete)/plans');
+        router.replace('/(athlete)/dashboard');
       }
     };
 

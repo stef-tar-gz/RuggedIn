@@ -31,6 +31,7 @@ export default function TrainerPublicProfileScreen() {
   const [trainer, setTrainer] = useState<TrainerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<Status>('loading');
+  const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [viewingPhoto, setViewingPhoto] = useState(false);
 
@@ -59,8 +60,12 @@ export default function TrainerPublicProfileScreen() {
       setTrainer(trainerRes.data);
 
       if (linkedRes.data?.trainer_id === id) setStatus('linked');
-      else if (pendingRes.data) setStatus('pending');
-      else setStatus('none');
+      else if (pendingRes.data) {
+        setStatus('pending');
+        setPendingRequestId(pendingRes.data.id);
+      } else {
+        setStatus('none');
+      }
 
       setLoading(false);
     };
@@ -174,9 +179,35 @@ export default function TrainerPublicProfileScreen() {
         )}
 
         {status === 'pending' && (
-          <View style={[s.statusBtn, s.statusBtnPending]}>
-            <Text style={[s.statusBtnText, s.statusBtnTextPending]}>Richiesta inviata</Text>
-          </View>
+          <>
+            <View style={[s.statusBtn, s.statusBtnPending]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="time-outline" size={16} color={colors.textMuted} />
+                <Text style={[s.statusBtnText, s.statusBtnTextPending]}>Richiesta in attesa</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={s.cancelBtn}
+              onPress={() => showAlert({
+                title: 'Annulla richiesta',
+                message: `Vuoi annullare la richiesta inviata a ${trainer?.full_name}?`,
+                buttons: [
+                  { text: 'Torna indietro', style: 'cancel' },
+                  {
+                    text: 'Annulla richiesta', style: 'destructive',
+                    onPress: async () => {
+                      if (!pendingRequestId) return;
+                      await supabase.from('trainer_athlete_requests').delete().eq('id', pendingRequestId);
+                      setStatus('none');
+                      setPendingRequestId(null);
+                    },
+                  },
+                ],
+              })}
+            >
+              <Text style={s.cancelBtnText}>Annulla richiesta</Text>
+            </TouchableOpacity>
+          </>
         )}
 
         {status === 'none' && (
@@ -219,4 +250,6 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   statusBtnText: { color: '#4CAF50', fontSize: 16, fontWeight: '700' },
   statusBtnPending: { borderColor: c.border },
   statusBtnTextPending: { color: c.textMuted },
+  cancelBtn: { marginTop: 10, borderRadius: 14, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: '#ef444466' },
+  cancelBtnText: { color: '#ef4444', fontSize: 15, fontWeight: '600' },
 });

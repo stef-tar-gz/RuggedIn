@@ -113,14 +113,14 @@ export default function AthleteProfileScreen() {
   useEffect(() => {
     if (profile) {
       setFullName(profile.full_name ?? '');
-      setBio((profile as any).bio ?? '');
-      setHeightCm((profile as any).height_cm ? String((profile as any).height_cm) : '');
-      setWeightKg((profile as any).weight_kg ? String((profile as any).weight_kg) : '');
-      setNotes((profile as any).notes ?? '');
-      setGoal((profile as any).goal ?? null);
-      setExperienceLevel((profile as any).experience_level ?? null);
-      setDaysPerWeek((profile as any).days_per_week ? String((profile as any).days_per_week) : '');
-      setAboutMe((profile as any).about_me ?? '');
+      setBio(profile.bio ?? '');
+      setHeightCm(profile.height_cm ? String(profile.height_cm) : '');
+      setWeightKg(profile.weight_kg ? String(profile.weight_kg) : '');
+      setNotes(profile.notes ?? '');
+      setGoal(profile.goal ?? null);
+      setExperienceLevel(profile.experience_level ?? null);
+      setDaysPerWeek(profile.days_per_week ? String(profile.days_per_week) : '');
+      setAboutMe(profile.about_me ?? '');
       setAvatarUrl(profile.avatar_url ?? null);
       setDisplayImage(localImageUriRef.current ?? profile.avatar_url ?? null);
     }
@@ -370,22 +370,31 @@ export default function AthleteProfileScreen() {
             {trainerLoading ? (
               <ActivityIndicator color={colors.accent} style={{ marginVertical: 12 }} />
             ) : currentTrainer ? (
-              <TouchableOpacity style={s.trainerCard} onPress={() => router.push({ pathname: '/(athlete)/trainer/[id]', params: { id: currentTrainer.id } })}>
-                {currentTrainer.avatar_url ? (
-                  <Image source={{ uri: currentTrainer.avatar_url }} style={s.trainerAvatar} contentFit="cover" />
-                ) : (
-                  <View style={s.trainerAvatarPlaceholder}>
-                    <Text style={s.trainerAvatarInitial}>{currentTrainer.full_name.charAt(0).toUpperCase()}</Text>
+              <>
+                <TouchableOpacity style={s.trainerCard} onPress={() => router.push({ pathname: '/(athlete)/trainer/[id]', params: { id: currentTrainer.id } })}>
+                  {currentTrainer.avatar_url ? (
+                    <Image source={{ uri: currentTrainer.avatar_url }} style={s.trainerAvatar} contentFit="cover" />
+                  ) : (
+                    <View style={s.trainerAvatarPlaceholder}>
+                      <Text style={s.trainerAvatarInitial}>{currentTrainer.full_name.charAt(0).toUpperCase()}</Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.trainerName}>{currentTrainer.full_name}</Text>
+                    {currentTrainer.bio ? <Text style={s.trainerBio} numberOfLines={2}>{currentTrainer.bio}</Text> : null}
                   </View>
-                )}
-                <View style={{ flex: 1 }}>
-                  <Text style={s.trainerName}>{currentTrainer.full_name}</Text>
-                  {currentTrainer.bio ? <Text style={s.trainerBio} numberOfLines={2}>{currentTrainer.bio}</Text> : null}
-                </View>
-                <TouchableOpacity style={s.changeTrainerBtn} onPress={(e) => { e.stopPropagation?.(); handleChangeTrainer(); }}>
-                  <Text style={s.changeTrainerText}>Cambia</Text>
+                  <TouchableOpacity style={s.changeTrainerBtn} onPress={(e) => { e.stopPropagation?.(); handleChangeTrainer(); }}>
+                    <Text style={s.changeTrainerText}>Cambia</Text>
+                  </TouchableOpacity>
                 </TouchableOpacity>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.chatTrainerBtn}
+                  onPress={() => router.push({ pathname: '/(athlete)/chat/[id]', params: { id: currentTrainer.id, name: currentTrainer.full_name } })}
+                >
+                  <Ionicons name="chatbubble-outline" size={18} color={colors.accent} />
+                  <Text style={s.chatTrainerText}>Messaggia {currentTrainer.full_name.split(' ')[0]}</Text>
+                </TouchableOpacity>
+              </>
             ) : pendingRequest ? (
               <View style={s.pendingCard}>
                 {pendingRequest.trainer.avatar_url ? (
@@ -510,4 +519,10 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   revokeText: { color: '#ef4444', fontSize: 13, fontWeight: '600' },
   findTrainerBtn: { backgroundColor: c.accentBg, borderRadius: 16, height: 56, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.accentBorder },
   findTrainerText: { color: c.accent, fontSize: 15, fontWeight: '800' },
+  chatTrainerBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    marginTop: 10, borderRadius: 14, padding: 16,
+    backgroundColor: c.surface, borderWidth: 1, borderColor: c.accentBorder,
+  },
+  chatTrainerText: { color: c.accent, fontSize: 15, fontWeight: '700' },
 });

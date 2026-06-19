@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../hooks/useProfile';
 import { useTheme } from '@/context/ThemeContext';
 import { useAlert } from '@/context/AlertContext';
+import { Skeleton } from '@/components/Skeleton';
 
 type PendingRequest = {
   id: string;
@@ -43,6 +44,8 @@ export default function RequestsScreen() {
       ]).start();
     }
   }, [loading]);
+
+  const fetchRequestsRef = useRef<(isRefresh?: boolean) => Promise<void>>();
 
   const fetchRequests = useCallback(async (isRefresh = false) => {
     if (!profile) return;
@@ -79,7 +82,31 @@ export default function RequestsScreen() {
     setLoading(false); setRefreshing(false);
   }, [profile]);
 
-  useFocusEffect(useCallback(() => { fetchRequests(); }, [fetchRequests]));
+  fetchRequestsRef.current = fetchRequests;
+
+  useFocusEffect(useCallback(() => {
+    fetchRequestsRef.current?.();
+
+    if (!profile?.id) return;
+
+    const silentRefetch = () => fetchRequestsRef.current?.();
+    const interval = setInterval(silentRefetch, 5000);
+
+    const channel = supabase
+      .channel(`requests_screen_${profile.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'trainer_athlete_requests',
+        filter: `trainer_id=eq.${profile.id}`,
+      }, silentRefetch)
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id]));
 
   const handleAccept = (req: PendingRequest) => {
     showAlert({
@@ -167,7 +194,18 @@ export default function RequestsScreen() {
       </Animated.View>
 
       {loading ? (
-        <View style={s.centered}><ActivityIndicator color={colors.accent} size="large" /></View>
+        <View style={{ paddingHorizontal: 24, gap: 12, marginTop: 8 }}>
+          {[0, 1, 2].map(i => (
+            <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.surface, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: colors.border }}>
+              <Skeleton width={48} height={48} borderRadius={24} />
+              <View style={{ flex: 1, gap: 6 }}>
+                <Skeleton width="55%" height={14} />
+                <Skeleton width="80%" height={12} />
+                <Skeleton width="35%" height={10} />
+              </View>
+            </View>
+          ))}
+        </View>
       ) : (
         <Animated.View style={[{ flex: 1 }, { opacity: listAnim, transform: [{ translateY: listAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }]}>
           <FlatList

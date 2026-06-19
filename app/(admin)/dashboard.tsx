@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useContext } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, Animated, Dimensions,
@@ -9,7 +9,9 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../hooks/useProfile';
 import { useTheme } from '../../context/ThemeContext';
+import { useAlert } from '../../context/AlertContext';
 import { ScalePressable } from '../../components/ScalePressable';
+import { Skeleton } from '../../components/Skeleton';
 
 const SCREEN_W = Dimensions.get('window').width;
 const CHART_W = SCREEN_W - 40 - 32; // scroll padding + card padding
@@ -60,6 +62,7 @@ function MiniChart({ data, color }: { data: DayCount[]; color: string }) {
 export default function AdminDashboard() {
   const { profile, loading: profileLoading } = useProfile();
   const { colors } = useTheme();
+  const { showAlert } = useAlert();
   const router = useRouter();
   const s = makeStyles(colors);
 
@@ -114,8 +117,24 @@ export default function AdminDashboard() {
 
   const handleApprove = async (req: PendingRequest) => {
     setApprovingId(req.id);
-    await supabase.from('trainer_athlete_requests').update({ status: 'accepted' }).eq('id', req.id);
-    await supabase.from('trainer_athlete').upsert({ trainer_id: req.trainer.id, athlete_id: req.athlete.id });
+    const { error: reqError } = await supabase
+      .from('trainer_athlete_requests')
+      .update({ status: 'accepted' })
+      .eq('id', req.id);
+    if (reqError) {
+      setApprovingId(null);
+      showAlert({ title: 'Errore', message: 'Impossibile approvare la richiesta. Riprova.' });
+      return;
+    }
+    const { error: pairError } = await supabase
+      .from('trainer_athlete')
+      .upsert({ trainer_id: req.trainer.id, athlete_id: req.athlete.id });
+    if (pairError) {
+      await supabase.from('trainer_athlete_requests').update({ status: 'pending' }).eq('id', req.id);
+      setApprovingId(null);
+      showAlert({ title: 'Errore', message: 'Impossibile creare la coppia trainer-atleta. Riprova.' });
+      return;
+    }
     setPendingRequests(prev => prev.filter(r => r.id !== req.id));
     setMetrics(prev => prev ? { ...prev, pending_requests: Math.max(0, prev.pending_requests - 1), active_pairs: prev.active_pairs + 1 } : prev);
     setApprovingId(null);
@@ -123,7 +142,15 @@ export default function AdminDashboard() {
 
   const handleReject = async (req: PendingRequest) => {
     setApprovingId(req.id);
-    await supabase.from('trainer_athlete_requests').update({ status: 'rejected' }).eq('id', req.id);
+    const { error } = await supabase
+      .from('trainer_athlete_requests')
+      .update({ status: 'rejected' })
+      .eq('id', req.id);
+    if (error) {
+      setApprovingId(null);
+      showAlert({ title: 'Errore', message: 'Impossibile rifiutare la richiesta. Riprova.' });
+      return;
+    }
     setPendingRequests(prev => prev.filter(r => r.id !== req.id));
     setMetrics(prev => prev ? { ...prev, pending_requests: Math.max(0, prev.pending_requests - 1) } : prev);
     setApprovingId(null);
@@ -135,7 +162,7 @@ export default function AdminDashboard() {
     return <View style={s.center}><ActivityIndicator color={colors.accent} /></View>;
   }
 
-  if (!(profile as any)?.is_admin) {
+  if (!profile?.is_admin) {
     return (
       <View style={s.center}>
         <Text style={s.errorText}>Accesso non autorizzato</Text>
@@ -169,7 +196,14 @@ export default function AdminDashboard() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
         {loading ? (
-          <View style={s.center}><ActivityIndicator color={colors.accent} style={{ marginTop: 32 }} /></View>
+          <View style={{ gap: 12, marginTop: 8 }}>
+            <Skeleton width="30%" height={11} style={{ marginBottom: 4 }} />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {[0,1,2,3,4,5].map(i => <Skeleton key={i} width="30%" height={80} borderRadius={16} style={{ flexGrow: 1 }} />)}
+            </View>
+            <Skeleton width="50%" height={11} style={{ marginTop: 20, marginBottom: 4 }} />
+            <Skeleton height={140} borderRadius={20} />
+          </View>
         ) : (
           <Animated.View style={{ opacity: fadeAnim }}>
 

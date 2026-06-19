@@ -79,9 +79,9 @@ export default function TrainerProfileScreen() {
   useEffect(() => {
     if (profile) {
       setFullName(profile.full_name ?? '');
-      setBio((profile as any).bio ?? '');
-      setNotes((profile as any).notes ?? '');
-      setInstagramHandle((profile as any).instagram_handle ?? '');
+      setBio(profile.bio ?? '');
+      setNotes(profile.notes ?? '');
+      setInstagramHandle(profile.instagram_handle ?? '');
       setAvatarUrl(profile.avatar_url ?? null);
       setDisplayImage(localImageUriRef.current ?? profile.avatar_url ?? null);
     }

@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Tabs } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../hooks/useProfile';
 import { useTheme } from '@/context/ThemeContext';
@@ -46,6 +46,7 @@ export default function SessionScreen() {
   const [planName, setPlanName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [partialSaved, setPartialSaved] = useState(false);
   const [sessionDate, setSessionDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -180,6 +181,33 @@ export default function SessionScreen() {
   const toLocalDateString = (date: Date) =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
+  const handleSavePartial = async () => {
+    const logDate = toLocalDateString(sessionDate);
+    const rows: any[] = [];
+    logs.forEach(log => {
+      log.sets.forEach(set => {
+        if (set.weight_used_kg.trim() === '') return;
+        rows.push({
+          athlete_id: profile!.id,
+          exercise_id: log.exercise.id,
+          workout_plan_id: planId,
+          log_date: logDate,
+          sets_done: 1,
+          reps_done: parseInt(set.reps_done) || log.exercise.reps,
+          weight_used_kg: parseFloat(set.weight_used_kg),
+          set_type: set.set_type,
+          day_index: dayIndex ? parseInt(dayIndex) : 1,
+        });
+      });
+    });
+    if (rows.length === 0) return;
+    setSaving(true);
+    await supabase.from('workout_logs').insert(rows);
+    setSaving(false);
+    setPartialSaved(true);
+    setTimeout(() => setPartialSaved(false), 3000);
+  };
+
   const handleSave = async () => {
     const hasAnyWeight = logs.some(l => l.sets.some(s => s.weight_used_kg.trim() !== ''));
     if (!hasAnyWeight) {
@@ -222,6 +250,8 @@ export default function SessionScreen() {
   }
 
   return (
+    <>
+      <Tabs.Screen options={{ tabBarStyle: { display: 'none' } }} />
     <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
 
     <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
@@ -359,6 +389,21 @@ export default function SessionScreen() {
         </Animated.View>
       ))}
 
+      <TouchableOpacity
+        style={[s.savePartialButton, partialSaved && s.savePartialButtonDone]}
+        onPress={handleSavePartial}
+        disabled={saving}
+      >
+        <Ionicons
+          name={partialSaved ? 'checkmark-circle-outline' : 'cloud-upload-outline'}
+          size={16}
+          color={partialSaved ? '#22c55e' : colors.textMuted}
+        />
+        <Text style={[s.savePartialText, partialSaved && { color: '#22c55e' }]}>
+          {partialSaved ? 'Progresso salvato' : 'Salva progresso'}
+        </Text>
+      </TouchableOpacity>
+
       <TouchableOpacity style={s.saveButton} onPress={handleSave} disabled={saving}>
         {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveButtonText}>Salva sessione</Text>}
       </TouchableOpacity>
@@ -366,6 +411,7 @@ export default function SessionScreen() {
     </ScrollView>
 
     </KeyboardAvoidingView>
+    </>
   );
 }
 
@@ -397,7 +443,14 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   setTypeText: { fontSize: 13, fontWeight: '800' },
   setInput: { backgroundColor: c.surfaceElevated, borderRadius: 8, padding: 10, color: c.text, fontSize: 15, borderWidth: 1, borderColor: c.border, textAlign: 'center', height: 40 },
   techniqueHint: { color: c.textMuted, fontSize: 12, marginTop: 6, fontStyle: 'italic' },
-  saveButton: { backgroundColor: c.accent, borderRadius: 12, padding: 18, alignItems: 'center', marginTop: 8 },
+  savePartialButton: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    borderRadius: 12, padding: 14, marginTop: 8,
+    backgroundColor: c.surface, borderWidth: 1, borderColor: c.border,
+  },
+  savePartialButtonDone: { borderColor: '#22c55e44', backgroundColor: '#0a2a1a' },
+  savePartialText: { color: c.textMuted, fontSize: 14, fontWeight: '600' },
+  saveButton: { backgroundColor: c.accent, borderRadius: 12, padding: 18, alignItems: 'center', marginTop: 10 },
   saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   restBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.accentBorder },
   restBtnDisabled: { backgroundColor: c.surfaceElevated, borderColor: c.border, opacity: 0.5 },

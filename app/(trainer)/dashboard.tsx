@@ -1,7 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
-  TouchableOpacity, ActivityIndicator, Animated,
+  ActivityIndicator, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -11,6 +11,7 @@ import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../hooks/useProfile';
 import { useTheme } from '@/context/ThemeContext';
 import { useAlert } from '@/context/AlertContext';
+import { Skeleton } from '@/components/Skeleton';
 
 type Athlete = { id: string; full_name: string; athlete_id: string; avatar_url: string | null };
 
@@ -19,50 +20,21 @@ export default function TrainerDashboard() {
   const { colors } = useTheme();
   const { showAlert } = useAlert();
   const [athletes, setAthletes] = useState<Athlete[]>([]);
-  const [requestCount, setRequestCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const s = makeStyles(colors);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const ringOpacity = useRef(new Animated.Value(1)).current;
+  const fetchDataRef = useRef<() => Promise<void>>();
 
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
   }, []);
 
-  useEffect(() => {
-    if (requestCount > 0) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.3, duration: 600, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-        ])
-      ).start();
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(ringOpacity, { toValue: 0.3, duration: 700, useNativeDriver: true }),
-          Animated.timing(ringOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-        ])
-      ).start();
-    } else {
-      pulseAnim.stopAnimation(); ringOpacity.stopAnimation();
-      pulseAnim.setValue(1); ringOpacity.setValue(1);
-    }
-  }, [requestCount]);
-
-  const fetchData = useCallback(async () => {
+  const fetchData = async () => {
     if (!profile) return;
     setLoading(true);
     try {
-      const [athletesRes, reqRes] = await Promise.all([
-        supabase.rpc('get_my_athletes'),
-        supabase
-          .from('trainer_athlete_requests')
-          .select('id', { count: 'exact', head: true })
-          .eq('trainer_id', profile.id)
-          .eq('status', 'pending'),
-      ]);
+      const athletesRes = await supabase.rpc('get_my_athletes');
 
       if (athletesRes.error) {
         showAlert({ title: 'Errore', message: athletesRes.error.message });
@@ -79,13 +51,21 @@ export default function TrainerDashboard() {
           setAthletes([]);
         }
       }
-      setRequestCount(reqRes.count ?? 0);
     } finally {
       setLoading(false);
     }
+  };
+
+  fetchDataRef.current = fetchData;
+
+  useEffect(() => {
+    if (profile) fetchDataRef.current?.();
   }, [profile]);
 
-  useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
+  useFocusEffect(useCallback(() => {
+    setLoading(true);
+    fetchDataRef.current?.();
+  }, []));
 
   if (profileLoading) {
     return <View style={s.centered}><ActivityIndicator color={colors.accent} size="large" /></View>;
@@ -95,37 +75,25 @@ export default function TrainerDashboard() {
     <Animated.View style={[s.container, { opacity: fadeAnim }]}>
       {/* Header */}
       <View style={s.header}>
-        <View style={s.headerLeft}>
-          <Text style={s.greeting}>BENVENUTO</Text>
-          <Text style={s.name}>{profile?.full_name}</Text>
-        </View>
-        <View style={s.headerActions}>
-          <TouchableOpacity style={s.iconWrap} onPress={() => router.push('/(trainer)/requests')}>
-            <Animated.View style={[s.iconRing, requestCount > 0 ? { borderColor: '#c97a00', opacity: ringOpacity } : { borderColor: '#4CAF50', opacity: 1 }]} />
-            <View style={s.iconBtn}>
-              <Ionicons name="mail-outline" size={18} color={colors.textSecondary} />
-            </View>
-            {requestCount > 0 && (
-              <Animated.View style={[s.badge, { transform: [{ scale: pulseAnim }] }]}>
-                <Text style={s.badgeText}>{requestCount}</Text>
-              </Animated.View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={s.avatarBtn} onPress={() => router.push('/(trainer)/profile')}>
-            {profile?.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={s.avatarBtnImg} contentFit="cover" />
-            ) : (
-              <Text style={s.avatarBtnInitial}>{profile?.full_name?.charAt(0).toUpperCase()}</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+        <Text style={s.greeting}>BENVENUTO</Text>
+        <Text style={s.name}>{profile?.full_name}</Text>
       </View>
 
       {/* Section label */}
       <Text style={s.sectionLabel}>I TUOI ATLETI</Text>
 
       {loading ? (
-        <ActivityIndicator color={colors.accent} style={{ marginTop: 32 }} />
+        <View style={{ paddingHorizontal: 20, gap: 12, marginTop: 8 }}>
+          {[0, 1, 2].map(i => (
+            <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <Skeleton width={52} height={52} borderRadius={26} />
+              <View style={{ flex: 1, gap: 6 }}>
+                <Skeleton width="60%" height={14} />
+                <Skeleton width="40%" height={12} />
+              </View>
+            </View>
+          ))}
+        </View>
       ) : athletes.length === 0 ? (
         <View style={s.emptyState}>
           <Ionicons name="barbell-outline" size={40} color={colors.textMuted} />
@@ -166,20 +134,9 @@ export default function TrainerDashboard() {
 const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg, paddingTop: 60, paddingHorizontal: 24 },
   centered: { flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 20 },
-  headerLeft: { flex: 1 },
+  header: { paddingBottom: 20 },
   greeting: { fontSize: 11, fontWeight: '800', color: c.textMuted, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 },
   name: { fontSize: 28, fontWeight: '900', color: c.text, letterSpacing: -0.5 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconWrap: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  iconRing: { position: 'absolute', width: 44, height: 44, borderRadius: 22, borderWidth: 2 },
-  iconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.border, overflow: 'hidden' },
-  iconEmoji: { fontSize: 16 },
-  badge: { position: 'absolute', top: -4, right: -4, backgroundColor: c.accent, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-  avatarBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: c.accentBg, borderWidth: 2, borderColor: c.accent, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  avatarBtnImg: { width: 44, height: 44, borderRadius: 22 },
-  avatarBtnInitial: { color: c.accent, fontSize: 18, fontWeight: '800' },
   sectionLabel: { fontSize: 11, fontWeight: '800', color: c.textMuted, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 16, marginTop: 8 },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
   emptyIcon: { fontSize: 40 },

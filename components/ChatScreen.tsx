@@ -47,11 +47,12 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
   useEffect(() => {
     supabase
       .from('profiles')
-      .select('avatar_url')
+      .select('avatar_url, last_seen')
       .eq('id', otherUserId)
       .single()
       .then(({ data }) => {
         setOtherAvatarUrl(data?.avatar_url ?? null);
+        setOtherLastSeen(data?.last_seen ?? null);
       });
   }, [otherUserId]);
 
@@ -197,7 +198,7 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
           </View>
           <View>
             <Text style={s.headerName}>{otherUserName}</Text>
-            <Text style={s.headerStatus}>
+            <Text style={[s.headerStatus, { color: isOnline(otherUserId) ? '#22c55e' : colors.textMuted }]}>
               {isOnline(otherUserId) ? 'Online' : otherLastSeen ? `Visto ${formatLastSeen(otherLastSeen)}` : 'Offline'}
             </Text>
           </View>
@@ -290,7 +291,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   headerAvatarText: { color: c.accent, fontSize: 16, fontWeight: '800' },
   onlineDot: { position: 'absolute', bottom: 0, right: 0, width: 11, height: 11, borderRadius: 6, backgroundColor: '#22c55e', borderWidth: 2, borderColor: c.surface },
   headerName: { color: c.text, fontSize: 15, fontWeight: '700' },
-  headerStatus: { color: '#22c55e', fontSize: 11, fontWeight: '600', marginTop: 1 },
+  headerStatus: { fontSize: 11, fontWeight: '600', marginTop: 1 },
 
   messageList: { paddingHorizontal: 16, paddingVertical: 16, flexGrow: 1 },
 
