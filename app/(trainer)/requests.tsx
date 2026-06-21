@@ -217,7 +217,7 @@ export default function RequestsScreen() {
             onRefresh={() => fetchRequests(true)}
             ListEmptyComponent={
               <View style={s.centered}>
-                <Text style={s.emptyIcon}>📭</Text>
+                <Ionicons name="mail-outline" size={44} color={colors.textMuted} style={{ marginBottom: 8 }} />
                 <Text style={s.emptyTitle}>Nessuna richiesta in attesa</Text>
                 <Text style={s.emptySubtitle}>Le nuove richieste appariranno qui</Text>
               </View>
@@ -236,7 +236,6 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   titleWrap: { position: 'absolute', left: 0, right: 0 },
   title: { textAlign: 'center', fontSize: 28, fontWeight: '900', color: c.text, letterSpacing: -0.5 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 8 },
-  emptyIcon: { fontSize: 40 },
   emptyTitle: { fontSize: 17, fontWeight: '700', color: c.text },
   emptySubtitle: { fontSize: 14, color: c.textSecondary },
   list: { paddingHorizontal: 24, paddingBottom: 40, gap: 12 },

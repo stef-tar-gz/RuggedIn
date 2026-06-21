@@ -179,7 +179,7 @@ export default function AthleteDashboard() {
         {/* ── HEADER ── */}
         <View style={s.header}>
           <Text style={s.dateLabel}>{dateLabel}</Text>
-          <Text style={s.greeting}>Ciao, {profile?.full_name?.split(' ')[0]} 👋</Text>
+          <Text style={s.greeting}>Ciao, {profile?.full_name?.split(' ')[0]}</Text>
         </View>
 
         {/* ── STATISTICHE ── */}
@@ -202,7 +202,7 @@ export default function AthleteDashboard() {
         {/* Streak */}
         {streakLabel && (
           <View style={s.streakCard}>
-            <Text style={s.streakFire}>🔥</Text>
+            <Ionicons name="flame" size={28} color={colors.accent} />
             <View style={{ flex: 1 }}>
               <Text style={s.streakValue}>{streakLabel}</Text>
               <Text style={s.streakSub}>Continua così!</Text>
@@ -242,11 +242,11 @@ export default function AthleteDashboard() {
         {/* ── TRAINER ── */}
         <Text style={s.sectionTitle}>Il mio trainer</Text>
         {trainer ? (
-          <ScalePressable onPress={() => router.push({
-            pathname: '/(athlete)/trainer/[id]',
-            params: { id: trainer.id },
-          })}>
-            <View style={s.trainerCard}>
+          <View style={s.trainerCard}>
+            <ScalePressable
+              style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 14 }}
+              onPress={() => router.push({ pathname: '/(athlete)/trainer/[id]', params: { id: trainer.id } })}
+            >
               {trainer.avatar_url ? (
                 <Image source={{ uri: trainer.avatar_url }} style={s.trainerAvatar} contentFit="cover" />
               ) : (
@@ -258,9 +258,14 @@ export default function AthleteDashboard() {
                 <Text style={s.trainerName}>{trainer.full_name}</Text>
                 <Text style={s.trainerSub}>Personal Trainer</Text>
               </View>
-              <Ionicons name="chatbubble-outline" size={18} color={colors.textMuted} />
-            </View>
-          </ScalePressable>
+            </ScalePressable>
+            <ScalePressable
+              onPress={() => router.push({ pathname: '/(athlete)/chat/[id]', params: { id: trainer.id, name: trainer.full_name } })}
+              style={s.chatIconBtn}
+            >
+              <Ionicons name="chatbubble-outline" size={18} color={colors.accent} />
+            </ScalePressable>
+          </View>
         ) : (
           <ScalePressable onPress={() => router.push('/(athlete)/find-trainer')}>
             <View style={s.findTrainerCard}>
@@ -330,10 +335,11 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
 
   // Trainer
   trainerCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: c.surface,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface,
     borderRadius: 20, padding: 18, borderWidth: 1, borderColor: c.border,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
+  chatIconBtn: { padding: 8, marginLeft: 4 },
   trainerAvatar: { width: 48, height: 48, borderRadius: 24 },
   trainerAvatarPlaceholder: { width: 48, height: 48, borderRadius: 24, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center' },
   trainerInitial: { color: c.accent, fontSize: 18, fontWeight: '800' },
