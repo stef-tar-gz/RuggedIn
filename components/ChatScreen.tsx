@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput,
   TouchableOpacity, KeyboardAvoidingView, Platform,
-  ActivityIndicator,
+  ActivityIndicator, Animated,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,7 +37,11 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [otherTyping, setOtherTyping] = useState(false);
   const listRef = useRef<FlatList>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const typingDotAnim = useRef(new Animated.Value(0)).current;
 
   const myId = profile?.id;
   const { isOnline } = usePresence(myId);
@@ -55,6 +59,44 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
         setOtherLastSeen(data?.last_seen ?? null);
       });
   }, [otherUserId]);
+
+  // Typing indicator via Realtime presence
+  useEffect(() => {
+    if (!myId) return;
+    const channelName = `typing_${[myId, otherUserId].sort().join('_')}`;
+    const channel = supabase.channel(channelName);
+    typingChannelRef.current = channel;
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState<{ user_id: string; typing: boolean }>();
+        const isTyping = Object.values(state)
+          .flat()
+          .some((p) => p.user_id === otherUserId && p.typing);
+        setOtherTyping(isTyping);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ user_id: myId, typing: false });
+        }
+      });
+
+    return () => { supabase.removeChannel(channel); };
+  }, [myId, otherUserId]);
+
+  useEffect(() => {
+    if (otherTyping) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(typingDotAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(typingDotAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+        ])
+      ).start();
+    } else {
+      typingDotAnim.stopAnimation();
+      typingDotAnim.setValue(0);
+    }
+  }, [otherTyping]);
 
   const fetchMessages = useCallback(async () => {
     if (!myId) return;
@@ -108,10 +150,24 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
     }
   }, [messages]);
 
+  const handleTyping = (value: string) => {
+    setText(value);
+    if (!myId || !typingChannelRef.current) return;
+    typingChannelRef.current.track({ user_id: myId, typing: value.length > 0 });
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    if (value.length > 0) {
+      typingTimeoutRef.current = setTimeout(() => {
+        typingChannelRef.current?.track({ user_id: myId, typing: false });
+      }, 2500);
+    }
+  };
+
   const handleSend = async () => {
     if (!text.trim() || !myId || sending) return;
     const content = text.trim();
     setText('');
+    typingChannelRef.current?.track({ user_id: myId, typing: false });
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     setSending(true);
 
     const tmpId = `tmp_${Date.now()}`;
@@ -198,9 +254,16 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
           </View>
           <View>
             <Text style={s.headerName}>{otherUserName}</Text>
-            <Text style={[s.headerStatus, { color: isOnline(otherUserId) ? '#22c55e' : colors.textMuted }]}>
-              {isOnline(otherUserId) ? 'Online' : otherLastSeen ? `Visto ${formatLastSeen(otherLastSeen)}` : 'Offline'}
-            </Text>
+            {otherTyping ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Animated.View style={[s.typingDot, { opacity: typingDotAnim }]} />
+                <Text style={[s.headerStatus, { color: colors.accent }]}>sta scrivendo…</Text>
+              </View>
+            ) : (
+              <Text style={[s.headerStatus, { color: isOnline(otherUserId) ? '#22c55e' : colors.textMuted }]}>
+                {isOnline(otherUserId) ? 'Online' : otherLastSeen ? `Visto ${formatLastSeen(otherLastSeen)}` : 'Offline'}
+              </Text>
+            )}
           </View>
         </View>
         <View style={{ width: 36 }} />
@@ -260,7 +323,7 @@ export default function ChatScreen({ otherUserId, otherUserName, backPath }: Pro
           placeholder="Scrivi un messaggio..."
           placeholderTextColor={colors.textMuted}
           value={text}
-          onChangeText={setText}
+          onChangeText={handleTyping}
           multiline
           maxLength={1000}
           onSubmitEditing={handleSend}
@@ -292,6 +355,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   onlineDot: { position: 'absolute', bottom: 0, right: 0, width: 11, height: 11, borderRadius: 6, backgroundColor: '#22c55e', borderWidth: 2, borderColor: c.surface },
   headerName: { color: c.text, fontSize: 15, fontWeight: '700' },
   headerStatus: { fontSize: 11, fontWeight: '600', marginTop: 1 },
+  typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: c.accent },
 
   messageList: { paddingHorizontal: 16, paddingVertical: 16, flexGrow: 1 },
 

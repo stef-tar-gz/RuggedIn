@@ -3,6 +3,12 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { ThemeProvider } from '../context/ThemeContext';
 import { AlertProvider } from '../context/AlertContext';
+import { useNotifications } from '../hooks/useNotifications';
+
+function NotificationsRegistrar() {
+  useNotifications();
+  return null;
+}
 
 export default function RootLayout() {
   const router = useRouter();
@@ -68,6 +74,7 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AlertProvider>
+        <NotificationsRegistrar />
         <Slot />
       </AlertProvider>
     </ThemeProvider>

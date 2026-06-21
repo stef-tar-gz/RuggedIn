@@ -22,6 +22,12 @@ type Stats = {
   streakDays: number;
   totalSessions: number;
   activePlanName: string | null;
+  activePlanId: string | null;
+};
+
+type NextWorkout = {
+  dayIndex: number;
+  exercises: { name: string; muscle_group: string | null }[];
 };
 
 const DAYS_IT = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
@@ -55,6 +61,7 @@ export default function AthleteDashboard() {
 
   const [trainer, setTrainer] = useState<TrainerInfo | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [nextWorkout, setNextWorkout] = useState<NextWorkout | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -123,7 +130,47 @@ export default function AthleteDashboard() {
       streakDays: streak,
       totalSessions: uniqueDates.length,
       activePlanName: activePlan?.name ?? null,
+      activePlanId: activePlan?.id ?? null,
     });
+
+    // Prossimo workout
+    if (activePlan) {
+      const { data: exData } = await supabase
+        .from('exercises')
+        .select('name, day_index, muscle_group')
+        .eq('workout_plan_id', activePlan.id)
+        .eq('is_deleted', false)
+        .order('day_index')
+        .order('order_index');
+
+      if (exData && exData.length > 0) {
+        const days = [...new Set(exData.map((e: any) => e.day_index as number))].sort((a, b) => a - b);
+        let nextDayIndex = days[0];
+
+        if (days.length > 1) {
+          const { data: lastLog } = await supabase
+            .from('workout_logs')
+            .select('day_index')
+            .eq('athlete_id', profile.id)
+            .eq('workout_plan_id', activePlan.id)
+            .order('log_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const lastPos = days.indexOf(lastLog?.day_index ?? -1);
+          nextDayIndex = lastPos === -1 || lastPos === days.length - 1 ? days[0] : days[lastPos + 1];
+        }
+
+        setNextWorkout({
+          dayIndex: nextDayIndex,
+          exercises: exData.filter((e: any) => e.day_index === nextDayIndex).map((e: any) => ({ name: e.name, muscle_group: e.muscle_group })),
+        });
+      } else {
+        setNextWorkout(null);
+      }
+    } else {
+      setNextWorkout(null);
+    }
 
     setLoading(false);
     Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
@@ -239,6 +286,34 @@ export default function AthleteDashboard() {
           </>
         )}
 
+        {/* ── PROSSIMO ALLENAMENTO ── */}
+        {nextWorkout && (
+          <>
+            <Text style={s.sectionTitle}>Prossimo allenamento</Text>
+            <ScalePressable onPress={() => router.push('/(athlete)/plans')}>
+              <View style={s.nextWorkoutCard}>
+                <View style={s.nextWorkoutHeader}>
+                  <Ionicons name="flash-outline" size={18} color={colors.accent} />
+                  <Text style={s.nextWorkoutDay}>Giorno {nextWorkout.dayIndex + 1}</Text>
+                  <Text style={s.nextWorkoutCount}>{nextWorkout.exercises.length} esercizi</Text>
+                </View>
+                <View style={s.nextWorkoutList}>
+                  {nextWorkout.exercises.slice(0, 3).map((ex, i) => (
+                    <View key={i} style={s.nextWorkoutRow}>
+                      <View style={s.nextWorkoutDot} />
+                      <Text style={s.nextWorkoutExName} numberOfLines={1}>{ex.name}</Text>
+                      {ex.muscle_group && <Text style={s.nextWorkoutMuscle}>{ex.muscle_group}</Text>}
+                    </View>
+                  ))}
+                  {nextWorkout.exercises.length > 3 && (
+                    <Text style={s.nextWorkoutMore}>+{nextWorkout.exercises.length - 3} altri</Text>
+                  )}
+                </View>
+              </View>
+            </ScalePressable>
+          </>
+        )}
+
         {/* ── TRAINER ── */}
         <Text style={s.sectionTitle}>Il mio trainer</Text>
         {trainer ? (
@@ -329,6 +404,22 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   },
   activePlanName: { flex: 1, fontSize: 15, fontWeight: '700', color: c.text },
   activePlanChevron: { color: c.textMuted, fontSize: 22 },
+
+  // Prossimo allenamento
+  nextWorkoutCard: {
+    backgroundColor: c.surface, borderRadius: 20, padding: 18,
+    borderWidth: 1, borderColor: c.border,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+  },
+  nextWorkoutHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+  nextWorkoutDay: { fontSize: 15, fontWeight: '800', color: c.text, flex: 1 },
+  nextWorkoutCount: { fontSize: 12, color: c.textMuted, fontWeight: '600' },
+  nextWorkoutList: { gap: 8 },
+  nextWorkoutRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  nextWorkoutDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: c.accent },
+  nextWorkoutExName: { flex: 1, fontSize: 14, fontWeight: '600', color: c.text },
+  nextWorkoutMuscle: { fontSize: 11, color: c.textMuted, fontWeight: '600' },
+  nextWorkoutMore: { fontSize: 12, color: c.textMuted, marginTop: 4, marginLeft: 16 },
 
   // Trainer
   trainerCard: {
