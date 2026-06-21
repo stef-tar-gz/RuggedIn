@@ -273,6 +273,13 @@ export default function SessionScreen() {
           </View>
         </TouchableOpacity>
         <Text style={s.sessionTitle}>{planName}{dayIndex ? ` — Giorno ${dayIndex}` : ''}</Text>
+        <TouchableOpacity onPress={handleSavePartial} disabled={saving} style={s.savePartialHeaderBtn}>
+          <Ionicons
+            name={partialSaved ? 'checkmark-circle' : 'cloud-upload-outline'}
+            size={20}
+            color={partialSaved ? '#22c55e' : colors.textMuted}
+          />
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={s.dateSelector} onPress={() => setShowDatePicker(true)}>
@@ -389,21 +396,6 @@ export default function SessionScreen() {
         </Animated.View>
       ))}
 
-      <TouchableOpacity
-        style={[s.savePartialButton, partialSaved && s.savePartialButtonDone]}
-        onPress={handleSavePartial}
-        disabled={saving}
-      >
-        <Ionicons
-          name={partialSaved ? 'checkmark-circle-outline' : 'cloud-upload-outline'}
-          size={16}
-          color={partialSaved ? '#22c55e' : colors.textMuted}
-        />
-        <Text style={[s.savePartialText, partialSaved && { color: '#22c55e' }]}>
-          {partialSaved ? 'Progresso salvato' : 'Salva progresso'}
-        </Text>
-      </TouchableOpacity>
-
       <TouchableOpacity style={s.saveButton} onPress={handleSave} disabled={saving}>
         {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveButtonText}>Salva sessione</Text>}
       </TouchableOpacity>
@@ -423,6 +415,7 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, gap: 16 },
   backText: { color: c.textMuted, fontSize: 14, fontWeight: '600' },
   sessionTitle: { color: c.text, fontSize: 18, fontWeight: '800', flex: 1 },
+  savePartialHeaderBtn: { padding: 4 },
   dateSelector: { backgroundColor: c.surface, borderRadius: 12, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, borderWidth: 1, borderColor: c.border },
   dateSelectorLabel: { color: c.textSecondary, fontSize: 14 },
   dateSelectorValue: { color: c.accent, fontSize: 16, fontWeight: '700' },
@@ -443,13 +436,6 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   setTypeText: { fontSize: 13, fontWeight: '800' },
   setInput: { backgroundColor: c.surfaceElevated, borderRadius: 8, padding: 10, color: c.text, fontSize: 15, borderWidth: 1, borderColor: c.border, textAlign: 'center', height: 40 },
   techniqueHint: { color: c.textMuted, fontSize: 12, marginTop: 6, fontStyle: 'italic' },
-  savePartialButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    borderRadius: 12, padding: 14, marginTop: 8,
-    backgroundColor: c.surface, borderWidth: 1, borderColor: c.border,
-  },
-  savePartialButtonDone: { borderColor: '#22c55e44', backgroundColor: '#0a2a1a' },
-  savePartialText: { color: c.textMuted, fontSize: 14, fontWeight: '600' },
   saveButton: { backgroundColor: c.accent, borderRadius: 12, padding: 18, alignItems: 'center', marginTop: 10 },
   saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   restBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.accentBorder },
