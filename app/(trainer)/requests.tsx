@@ -47,10 +47,10 @@ export default function RequestsScreen() {
 
   const fetchRequestsRef = useRef<(isRefresh?: boolean) => Promise<void>>();
 
-  const fetchRequests = useCallback(async (isRefresh = false) => {
+  const fetchRequests = useCallback(async (mode: 'initial' | 'refresh' | 'silent' = 'initial') => {
     if (!profile) return;
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+    if (mode === 'initial') setLoading(true);
+    if (mode === 'refresh') setRefreshing(true);
 
     const { data: reqData, error } = await supabase
       .from('trainer_athlete_requests')
@@ -60,7 +60,7 @@ export default function RequestsScreen() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      showAlert({ title: 'Errore', message: error.message });
+      if (mode !== 'silent') showAlert({ title: 'Errore', message: error.message });
       setLoading(false); setRefreshing(false); return;
     }
 
@@ -85,11 +85,11 @@ export default function RequestsScreen() {
   fetchRequestsRef.current = fetchRequests;
 
   useFocusEffect(useCallback(() => {
-    fetchRequestsRef.current?.();
+    fetchRequestsRef.current?.('initial');
 
     if (!profile?.id) return;
 
-    const silentRefetch = () => fetchRequestsRef.current?.();
+    const silentRefetch = () => fetchRequestsRef.current?.('silent');
     const interval = setInterval(silentRefetch, 5000);
 
     const channel = supabase
@@ -214,7 +214,7 @@ export default function RequestsScreen() {
             renderItem={renderItem}
             contentContainerStyle={s.list}
             refreshing={refreshing}
-            onRefresh={() => fetchRequests(true)}
+            onRefresh={() => fetchRequests('refresh')}
             ListEmptyComponent={
               <View style={s.centered}>
                 <Ionicons name="mail-outline" size={44} color={colors.textMuted} style={{ marginBottom: 8 }} />
