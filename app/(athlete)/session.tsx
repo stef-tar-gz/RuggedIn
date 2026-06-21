@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../hooks/useProfile';
 import { useTheme } from '@/context/ThemeContext';
 import { useAlert } from '@/context/AlertContext';
+import { useSession } from '@/context/SessionContext';
 
 type Exercise = {
   id: string;
@@ -42,11 +43,12 @@ export default function SessionScreen() {
   const router = useRouter();
   const { showAlert } = useAlert();
 
+  const { activeSession, startSession, updateLogs, updateDate, clearSession } = useSession();
+
   const [logs, setLogs] = useState<ExerciseLog[]>([]);
   const [planName, setPlanName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [partialSaved, setPartialSaved] = useState(false);
   const [sessionDate, setSessionDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -64,7 +66,17 @@ export default function SessionScreen() {
 
   const s = makeStyles(colors);
 
-  useEffect(() => { fetchPlan(); }, [planId]);
+  useEffect(() => {
+    if (activeSession?.planId === planId) {
+      // Ripristina sessione dal context
+      setPlanName(activeSession.planName);
+      setLogs(activeSession.logs);
+      setSessionDate(activeSession.sessionDate);
+      setLoading(false);
+    } else {
+      fetchPlan();
+    }
+  }, [planId]);
 
   const fetchPlan = async () => {
     const { data: planData } = await supabase
@@ -73,7 +85,8 @@ export default function SessionScreen() {
       .eq('id', planId)
       .single();
 
-    if (planData) setPlanName(planData.name);
+    const name = planData?.name ?? '';
+    setPlanName(name);
 
     let query = supabase
       .from('exercises')
@@ -85,8 +98,10 @@ export default function SessionScreen() {
     if (dayIndex) query = query.eq('day_index', parseInt(dayIndex));
 
     const { data: exData } = await query;
-    if (exData) setLogs((exData as Exercise[]).map(e => buildInitialLog(e)));
+    const initialLogs = exData ? (exData as Exercise[]).map(e => buildInitialLog(e)) : [];
+    setLogs(initialLogs);
 
+    startSession({ planId, dayIndex, planName: name, logs: initialLogs, sessionDate: new Date() });
     setLoading(false);
   };
 
@@ -171,6 +186,7 @@ export default function SessionScreen() {
       const sets = [...updated[exIndex].sets];
       sets[setIndex] = { ...sets[setIndex], [field]: value };
       updated[exIndex] = { ...updated[exIndex], sets };
+      updateLogs(updated);
       return updated;
     });
   };
@@ -180,33 +196,6 @@ export default function SessionScreen() {
 
   const toLocalDateString = (date: Date) =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-
-  const handleSavePartial = async () => {
-    const logDate = toLocalDateString(sessionDate);
-    const rows: any[] = [];
-    logs.forEach(log => {
-      log.sets.forEach(set => {
-        if (set.weight_used_kg.trim() === '') return;
-        rows.push({
-          athlete_id: profile!.id,
-          exercise_id: log.exercise.id,
-          workout_plan_id: planId,
-          log_date: logDate,
-          sets_done: 1,
-          reps_done: parseInt(set.reps_done) || log.exercise.reps,
-          weight_used_kg: parseFloat(set.weight_used_kg),
-          set_type: set.set_type,
-          day_index: dayIndex ? parseInt(dayIndex) : 1,
-        });
-      });
-    });
-    if (rows.length === 0) return;
-    setSaving(true);
-    await supabase.from('workout_logs').insert(rows);
-    setSaving(false);
-    setPartialSaved(true);
-    setTimeout(() => setPartialSaved(false), 3000);
-  };
 
   const handleSave = async () => {
     const hasAnyWeight = logs.some(l => l.sets.some(s => s.weight_used_kg.trim() !== ''));
@@ -236,9 +225,10 @@ export default function SessionScreen() {
     const { error } = await supabase.from('workout_logs').insert(rows);
     if (error) { showAlert({ title: 'Errore', message: error.message }); setSaving(false); return; }
     setSaving(false);
+    clearSession();
     showAlert({
       title: 'Sessione salvata!',
-      message: `Ottimo lavoro 💪\n${formatDate(sessionDate)}`,
+      message: `Ottimo lavoro!\n${formatDate(sessionDate)}`,
       buttons: [
         { text: 'OK', onPress: () => router.replace('/(athlete)/plans') },
       ],
@@ -257,29 +247,14 @@ export default function SessionScreen() {
     <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
 
       <View style={s.header}>
-        <TouchableOpacity onPress={() => {
-          showAlert({
-            title: 'Abbandona sessione',
-            message: 'Sei sicuro? I dati non salvati andranno persi.',
-            buttons: [
-              { text: 'Continua', style: 'cancel' },
-              { text: 'Abbandona', style: 'destructive', onPress: () => router.replace('/(athlete)/plans') },
-            ],
-          });
-        }}>
+        <TouchableOpacity onPress={() => router.back()}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="close" size={18} color={colors.textMuted} />
-            <Text style={s.backText}>Abbandona</Text>
+            <Ionicons name="chevron-down" size={20} color={colors.textMuted} />
+            <Text style={s.backText}>Minimizza</Text>
           </View>
         </TouchableOpacity>
         <Text style={s.sessionTitle}>{planName}{dayIndex ? ` — Giorno ${dayIndex}` : ''}</Text>
-        <TouchableOpacity onPress={handleSavePartial} disabled={saving} style={s.savePartialHeaderBtn}>
-          <Ionicons
-            name={partialSaved ? 'checkmark-circle' : 'cloud-upload-outline'}
-            size={20}
-            color={partialSaved ? '#22c55e' : colors.textMuted}
-          />
-        </TouchableOpacity>
+        <View style={{ width: 32 }} />
       </View>
 
       <TouchableOpacity style={s.dateSelector} onPress={() => setShowDatePicker(true)}>
@@ -298,7 +273,7 @@ export default function SessionScreen() {
           maximumDate={new Date()}
           onChange={(_, selectedDate) => {
             setShowDatePicker(false);
-            if (selectedDate) setSessionDate(selectedDate);
+            if (selectedDate) { setSessionDate(selectedDate); updateDate(selectedDate); }
           }}
         />
       )}
@@ -415,7 +390,6 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, gap: 16 },
   backText: { color: c.textMuted, fontSize: 14, fontWeight: '600' },
   sessionTitle: { color: c.text, fontSize: 18, fontWeight: '800', flex: 1 },
-  savePartialHeaderBtn: { padding: 4 },
   dateSelector: { backgroundColor: c.surface, borderRadius: 12, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, borderWidth: 1, borderColor: c.border },
   dateSelectorLabel: { color: c.textSecondary, fontSize: 14 },
   dateSelectorValue: { color: c.accent, fontSize: 16, fontWeight: '700' },
