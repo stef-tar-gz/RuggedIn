@@ -40,9 +40,7 @@
           "photosPermission": "RuggedIn vuole accedere alle tue foto per impostare l'immagine del profilo."
         }
       ],
-      "@react-native-community/datetimepicker",
-      "react-native-reanimated/plugin",
-      "@shopify/react-native-skia"
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "router": {},
