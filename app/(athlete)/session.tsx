@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter, Tabs } from 'expo-router';
+import { useLocalSearchParams, useRouter, Tabs, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useProfile } from '../../hooks/useProfile';
 import { useTheme } from '@/context/ThemeContext';
@@ -63,8 +63,19 @@ export default function SessionScreen() {
   const [borderExIndex, setBorderExIndex] = useState(-1);
   const progressAnim = useRef(new Animated.Value(1)).current;
   const TIMER_HEIGHT = 82;
+  const slideAnim = useRef(new Animated.Value(60)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const s = makeStyles(colors);
+
+  useFocusEffect(useCallback(() => {
+    slideAnim.setValue(60);
+    fadeAnim.setValue(0);
+    Animated.parallel([
+      Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 180 }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+    ]).start();
+  }, []));
 
   useEffect(() => {
     if (activeSession?.planId === planId) {
@@ -242,19 +253,18 @@ export default function SessionScreen() {
   return (
     <>
       <Tabs.Screen options={{ tabBarStyle: { display: 'none' } }} />
+    <Animated.View style={[s.flex, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
     <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
 
     <ScrollView style={s.container} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
 
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="chevron-down" size={20} color={colors.textMuted} />
-            <Text style={s.backText}>Minimizza</Text>
-          </View>
+        <View style={s.titleWrap} pointerEvents="none">
+          <Text style={s.sessionTitle}>{planName}{dayIndex ? ` — Giorno ${dayIndex}` : ''}</Text>
+        </View>
+        <TouchableOpacity onPress={() => router.back()} style={s.minimizeBtn}>
+          <Ionicons name="chevron-down" size={22} color={colors.textMuted} />
         </TouchableOpacity>
-        <Text style={s.sessionTitle}>{planName}{dayIndex ? ` — Giorno ${dayIndex}` : ''}</Text>
-        <View style={{ width: 32 }} />
       </View>
 
       <TouchableOpacity style={s.dateSelector} onPress={() => setShowDatePicker(true)}>
@@ -378,6 +388,7 @@ export default function SessionScreen() {
     </ScrollView>
 
     </KeyboardAvoidingView>
+    </Animated.View>
     </>
   );
 }
@@ -387,9 +398,10 @@ const makeStyles = (c: ReturnType<typeof useTheme>['colors']) => StyleSheet.crea
   container: { flex: 1, backgroundColor: c.bg },
   content: { paddingHorizontal: 24, paddingTop: 60, paddingBottom: 48 },
   centered: { flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, gap: 16 },
-  backText: { color: c.textMuted, fontSize: 14, fontWeight: '600' },
-  sessionTitle: { color: c.text, fontSize: 18, fontWeight: '800', flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+  titleWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  sessionTitle: { color: c.text, fontSize: 18, fontWeight: '800' },
+  minimizeBtn: { marginLeft: 'auto', padding: 4 },
   dateSelector: { backgroundColor: c.surface, borderRadius: 12, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, borderWidth: 1, borderColor: c.border },
   dateSelectorLabel: { color: c.textSecondary, fontSize: 14 },
   dateSelectorValue: { color: c.accent, fontSize: 16, fontWeight: '700' },

@@ -138,7 +138,7 @@ export default function AthleteLayout() {
           }}
         />
         {/* Schermate accessibili ma senza tab */}
-        <Tabs.Screen name="session" options={{ href: null, tabBarStyle: { display: 'none' }, animation: 'slide_from_bottom' }} />
+        <Tabs.Screen name="session" options={{ href: null, tabBarStyle: { display: 'none' } }} />
         <Tabs.Screen name="find-trainer" options={{ href: null }} />
         <Tabs.Screen name="settings" options={{ href: null }} />
         <Tabs.Screen name="plan/[id]" options={{ href: null }} />

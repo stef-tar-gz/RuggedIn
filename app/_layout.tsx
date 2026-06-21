@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { ThemeProvider } from '../context/ThemeContext';
@@ -14,9 +14,15 @@ function NotificationsRegistrar() {
 export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    mounted.current = true;
+  }, []);
 
   useEffect(() => {
     const redirectByRole = async (session: any) => {
+      if (!mounted.current) return;
       if (!session) {
         if (segments[0] === '(auth)') return;
         router.replace('/(auth)/login');
@@ -62,7 +68,7 @@ export default function RootLayout() {
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      redirectByRole(session);
+      setTimeout(() => redirectByRole(session), 0);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
