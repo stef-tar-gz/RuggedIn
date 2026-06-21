@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Image, Animated } from 'react-native';
+import { View, Text, StyleSheet, Image, Animated } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,7 +30,9 @@ function RequestsTabIcon({ color, size, count }: { color: string; size: number; 
     <View style={{ width: size + 8, height: size + 8, alignItems: 'center', justifyContent: 'center' }}>
       <Ionicons name="people-outline" size={size} color={color} />
       {count > 0 && (
-        <Animated.View style={[styles.badge, { backgroundColor: colors.accent, transform: [{ scale: pulseAnim }] }]} />
+        <Animated.View style={[styles.badge, { transform: [{ scale: pulseAnim }] }]}>
+          <Text style={styles.badgeText}>{count > 99 ? '99+' : count}</Text>
+        </Animated.View>
       )}
     </View>
   );
@@ -157,10 +159,20 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: -4,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 12,
   },
 });
