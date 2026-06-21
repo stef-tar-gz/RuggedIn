@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Animated } from 'react-native';
+import { useRef, useEffect } from 'react';
 import { Tabs, useRouter, useSegments } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,6 +35,19 @@ function SessionPill() {
   const insets = useSafeAreaInsets();
   const segments = useSegments();
   const isOnSession = segments.includes('session' as never);
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    if (activeSession && !isOnSession) {
+      scaleAnim.setValue(0.6);
+      translateY.setValue(16);
+      Animated.parallel([
+        Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, damping: 14, stiffness: 200 }),
+        Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 14, stiffness: 200 }),
+      ]).start();
+    }
+  }, [activeSession, isOnSession]);
 
   if (!activeSession || isOnSession) return null;
 
@@ -51,8 +65,9 @@ function SessionPill() {
   };
 
   return (
+    <Animated.View style={[styles.pillWrap, { bottom: TAB_BAR_HEIGHT + 10, transform: [{ scale: scaleAnim }, { translateY }] }]}>
     <TouchableOpacity
-      style={[styles.pill, { backgroundColor: colors.accent, bottom: TAB_BAR_HEIGHT + 10 }]}
+      style={[styles.pill, { backgroundColor: colors.accent }]}
       onPress={() => router.push({
         pathname: '/(athlete)/session',
         params: { planId: activeSession.planId, dayIndex: activeSession.dayIndex ?? '' },
@@ -67,6 +82,7 @@ function SessionPill() {
         <Ionicons name="close" size={16} color="rgba(255,255,255,0.75)" />
       </TouchableOpacity>
     </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -122,7 +138,7 @@ export default function AthleteLayout() {
           }}
         />
         {/* Schermate accessibili ma senza tab */}
-        <Tabs.Screen name="session" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="session" options={{ href: null, tabBarStyle: { display: 'none' }, animation: 'slide_from_bottom' }} />
         <Tabs.Screen name="find-trainer" options={{ href: null }} />
         <Tabs.Screen name="settings" options={{ href: null }} />
         <Tabs.Screen name="plan/[id]" options={{ href: null }} />
@@ -137,9 +153,14 @@ export default function AthleteLayout() {
 const styles = StyleSheet.create({
   avatarWrap: { borderRadius: 100, borderWidth: 1.5, overflow: 'hidden' },
   avatar: {},
-  pill: {
+  pillWrap: {
     position: 'absolute',
     alignSelf: 'center',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  pill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -148,7 +169,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
     maxWidth: '80%',
