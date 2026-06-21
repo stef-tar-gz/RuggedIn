@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from './useProfile';
 
@@ -37,6 +38,10 @@ export function useNotifications() {
       }
 
       if (finalStatus !== 'granted') return;
+
+      // Push token non disponibile in Expo Go da SDK 53
+      const isExpoGo = Constants.executionEnvironment === 'storeClient';
+      if (isExpoGo) { tokenSavedRef.current = true; return; }
 
       const tokenData = await Notifications.getExpoPushTokenAsync();
       const token = tokenData.data;
