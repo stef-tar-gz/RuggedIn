@@ -1,12 +1,18 @@
 import { View, Text, StyleSheet, Image, TouchableOpacity, Animated } from 'react-native';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { Tabs, useRouter, useSegments } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Rect } from 'react-native-svg';
+import Reanimated, {
+  useSharedValue, useAnimatedProps, withRepeat, withTiming, Easing as ReEasing,
+} from 'react-native-reanimated';
 import { useTheme } from '@/context/ThemeContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useSession } from '@/context/SessionContext';
 import { useAlert } from '@/context/AlertContext';
+
+const AnimatedRect = Reanimated.createAnimatedComponent(Rect);
 
 function ProfileTabIcon({ color, size }: { color: string; size: number }) {
   const { profile } = useProfile();
@@ -38,6 +44,37 @@ function SessionPill() {
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(20)).current;
 
+  // SVG running border
+  const PAD = 4;
+  const [pillSize, setPillSize] = useState<{ w: number; h: number } | null>(null);
+  const perimSV = useSharedValue(0);
+  const progress = useSharedValue(0);
+
+  const svgW = pillSize ? pillSize.w + PAD * 2 : 0;
+  const svgH = pillSize ? pillSize.h + PAD * 2 : 0;
+  const perim = svgW > 0 ? 2 * Math.max(svgW - svgH, 0) + Math.PI * svgH : 0;
+  const dashLen = perim * 0.38;
+  const gapLen = perim * 0.62;
+
+  const onPillLayout = useCallback((e: any) => {
+    const { width: w, height: h } = e.nativeEvent.layout;
+    setPillSize({ w, h });
+    const p = 2 * Math.max((w + PAD * 2) - (h + PAD * 2), 0) + Math.PI * (h + PAD * 2);
+    perimSV.value = p;
+  }, []);
+
+  const borderProps = useAnimatedProps(() => ({
+    strokeDashoffset: -(progress.value * perimSV.value),
+  }));
+
+  useEffect(() => {
+    progress.value = withRepeat(
+      withTiming(1, { duration: 2000, easing: ReEasing.linear }),
+      -1,
+      false,
+    );
+  }, []);
+
   useEffect(() => {
     if (activeSession && !isOnSession) {
       scaleAnim.setValue(0.6);
@@ -66,22 +103,44 @@ function SessionPill() {
 
   return (
     <Animated.View style={[styles.pillWrap, { bottom: TAB_BAR_HEIGHT + 10, transform: [{ scale: scaleAnim }, { translateY }] }]}>
-    <TouchableOpacity
-      style={[styles.pill, { backgroundColor: colors.accent }]}
-      onPress={() => router.push({
-        pathname: '/(athlete)/session',
-        params: { planId: activeSession.planId, dayIndex: activeSession.dayIndex ?? '' },
-      })}
-      activeOpacity={0.9}
-    >
-      <Ionicons name="flash" size={14} color="#fff" />
-      <Text style={styles.pillText} numberOfLines={1}>
-        {activeSession.planName}{activeSession.dayIndex ? ` · Giorno ${Number(activeSession.dayIndex) + 1}` : ''}
-      </Text>
-      <TouchableOpacity onPress={handleDiscard} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-        <Ionicons name="close" size={16} color="rgba(255,255,255,0.75)" />
-      </TouchableOpacity>
-    </TouchableOpacity>
+      <View style={styles.pillContainer}>
+        <TouchableOpacity
+          style={[styles.pill, { backgroundColor: colors.accent }]}
+          onLayout={onPillLayout}
+          onPress={() => router.push({
+            pathname: '/(athlete)/session',
+            params: { planId: activeSession.planId, dayIndex: activeSession.dayIndex ?? '' },
+          })}
+          activeOpacity={0.9}
+        >
+          <Ionicons name="flash" size={14} color="#fff" />
+          <Text style={styles.pillText} numberOfLines={1}>
+            {activeSession.planName}{activeSession.dayIndex ? ` · Giorno ${Number(activeSession.dayIndex) + 1}` : ''}
+          </Text>
+          <TouchableOpacity onPress={handleDiscard} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="close" size={16} color="rgba(255,255,255,0.75)" />
+          </TouchableOpacity>
+        </TouchableOpacity>
+        {pillSize && (
+          <Svg
+            width={svgW}
+            height={svgH}
+            style={{ position: 'absolute', top: -PAD, left: -PAD }}
+            pointerEvents="none"
+          >
+            <AnimatedRect
+              x={1} y={1}
+              width={svgW - 2} height={svgH - 2}
+              rx={(svgH - 2) / 2}
+              fill="none"
+              stroke={colors.accent}
+              strokeWidth={2.5}
+              strokeDasharray={`${dashLen} ${gapLen}`}
+              animatedProps={borderProps}
+            />
+          </Svg>
+        )}
+      </View>
     </Animated.View>
   );
 }
@@ -160,6 +219,9 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
   },
+  pillContainer: {
+    alignSelf: 'center',
+  },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -172,12 +234,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
+    alignSelf: 'center',
     maxWidth: '80%',
   },
   pillText: {
-    flex: 1,
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
+    flexShrink: 1,
   },
 });
