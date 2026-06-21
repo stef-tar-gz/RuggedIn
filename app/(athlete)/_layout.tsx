@@ -26,13 +26,16 @@ function ProfileTabIcon({ color, size }: { color: string; size: number }) {
   return <Ionicons name="person-outline" size={size} color={color} />;
 }
 
-function SessionBanner() {
+function SessionPill() {
   const { activeSession, clearSession } = useSession();
   const { colors } = useTheme();
   const { showAlert } = useAlert();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   if (!activeSession) return null;
+
+  const TAB_BAR_HEIGHT = 60 + insets.bottom;
 
   const handleDiscard = () => {
     showAlert({
@@ -47,19 +50,19 @@ function SessionBanner() {
 
   return (
     <TouchableOpacity
-      style={[styles.banner, { backgroundColor: colors.accent }]}
+      style={[styles.pill, { backgroundColor: colors.accent, bottom: TAB_BAR_HEIGHT + 10 }]}
       onPress={() => router.push({
         pathname: '/(athlete)/session',
         params: { planId: activeSession.planId, dayIndex: activeSession.dayIndex ?? '' },
       })}
-      activeOpacity={0.85}
+      activeOpacity={0.9}
     >
-      <Ionicons name="flash" size={16} color="#fff" />
-      <Text style={styles.bannerText} numberOfLines={1}>
-        Sessione in corso · {activeSession.planName}
+      <Ionicons name="flash" size={14} color="#fff" />
+      <Text style={styles.pillText} numberOfLines={1}>
+        {activeSession.planName}{activeSession.dayIndex ? ` · Giorno ${Number(activeSession.dayIndex) + 1}` : ''}
       </Text>
-      <TouchableOpacity onPress={handleDiscard} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-        <Ionicons name="close" size={18} color="rgba(255,255,255,0.8)" />
+      <TouchableOpacity onPress={handleDiscard} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+        <Ionicons name="close" size={16} color="rgba(255,255,255,0.75)" />
       </TouchableOpacity>
     </TouchableOpacity>
   );
@@ -71,7 +74,6 @@ export default function AthleteLayout() {
 
   return (
     <View style={{ flex: 1 }}>
-      <SessionBanner />
       <Tabs
         screenOptions={{
           headerShown: false,
@@ -125,6 +127,7 @@ export default function AthleteLayout() {
         <Tabs.Screen name="trainer/[id]" options={{ href: null }} />
         <Tabs.Screen name="chat/[id]" options={{ href: null }} />
       </Tabs>
+      <SessionPill />
     </View>
   );
 }
@@ -132,14 +135,23 @@ export default function AthleteLayout() {
 const styles = StyleSheet.create({
   avatarWrap: { borderRadius: 100, borderWidth: 1.5, overflow: 'hidden' },
   avatar: {},
-  banner: {
+  pill: {
+    position: 'absolute',
+    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 10,
+    borderRadius: 999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+    maxWidth: '80%',
   },
-  bannerText: {
+  pillText: {
     flex: 1,
     color: '#fff',
     fontSize: 13,
