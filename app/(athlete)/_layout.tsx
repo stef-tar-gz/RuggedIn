@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs, useRouter, useSegments } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/ThemeContext';
@@ -32,8 +32,10 @@ function SessionPill() {
   const { showAlert } = useAlert();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const segments = useSegments();
+  const isOnSession = segments.includes('session' as never);
 
-  if (!activeSession) return null;
+  if (!activeSession || isOnSession) return null;
 
   const TAB_BAR_HEIGHT = 60 + insets.bottom;
 
